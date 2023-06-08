@@ -25,20 +25,35 @@ import subprocess
 import glob
 import logging
 import re
+import configparser
+import itertools
+from appdirs import user_config_dir  # Provides path to the settings directory
 
 try: import simplejson as json
 except ImportError: import json
 
 from . import pronsole
 from . import printcore
+from . import stlplater as plater
+from . import gcodeplater as gcplater
+from .excluder import Excluder
+from printrun import projectlayer, gcoder
 from printrun.spoolmanager import spoolmanager_gui
 from .gui import about
+
+from .gui.widgets import SpecialButton, MacroEditor, PronterOptions, ButtonEdit, get_space
+
+from .gui import MainWindow
+from .settings import HiddenSetting, StringSetting, SpinSetting, \
+    FloatSpinSetting, BooleanSetting, StaticTextSetting, ColorSetting, ComboSetting
+from .pronsole import REPORT_NONE, REPORT_POS, REPORT_TEMP, REPORT_MANUAL
 
 from .utils import install_locale, setup_logging, dosify, \
     iconfile, format_time, format_duration, \
     hexcolor_to_float, parse_temperature_report, \
-    prepare_command, check_rgb_color, check_rgba_color, compile_file, \
+    prepare_command, compile_file, \
     write_history_to, read_history_from
+
 install_locale('pronterface')
 
 try:
@@ -50,8 +65,6 @@ except:
     logging.error(_("WX >= 4 is not installed. This program requires WX >= 4 to run."))
     raise
 
-from .gui.widgets import SpecialButton, MacroEditor, PronterOptions, ButtonEdit, get_space
-
 winsize = (800, 500)
 layerindex = 0
 if os.name == "nt":
@@ -61,13 +74,6 @@ pronterface_quitting = False
 
 class PronterfaceQuitException(Exception):
     pass
-
-
-from .gui import MainWindow
-from .settings import wxSetting, HiddenSetting, StringSetting, SpinSetting, \
-    FloatSpinSetting, BooleanSetting, StaticTextSetting, ColorSetting, ComboSetting
-from printrun import gcoder
-from .pronsole import REPORT_NONE, REPORT_POS, REPORT_TEMP, REPORT_MANUAL
 
 def format_length(mm, fractional=2):
     if mm <= 10:
@@ -583,8 +589,7 @@ class PronterWindow(MainWindow, pronsole.pronsole):
             e.Skip()
 
     def plate(self, e):
-        from . import stlplater as plater
-        self.log(_("Plate function activated"))
+        self.log(_("STL plate function activated"))
         plater.StlPlater(size = (800, 580), callback = self.platecb,
                          parent = self,
                          build_dimensions = self.build_dimensions_list,
@@ -593,9 +598,8 @@ class PronterWindow(MainWindow, pronsole.pronsole):
                          antialias_samples = int(self.settings.antialias3dsamples)).Show()
 
     def plate_gcode(self, e):
-        from . import gcodeplater as plater
         self.log(_("G-Code plate function activated"))
-        plater.GcodePlater(size = (800, 580), callback = self.platecb,
+        gcplater.GcodePlater(size = (800, 580), callback = self.platecb,
                            parent = self,
                            build_dimensions = self.build_dimensions_list,
                            circular_platform = self.settings.circular_bed,
@@ -847,9 +851,10 @@ class PronterWindow(MainWindow, pronsole.pronsole):
         self.macros_menu = wx.Menu()
         m.AppendSubMenu(self.macros_menu, _("&Macros"))
         self.Bind(wx.EVT_MENU, self.new_macro, self.macros_menu.Append(-1, _("<&New...>")))
-        self.Bind(wx.EVT_MENU, lambda *e: PronterOptions(self), m.Append(-1, _("&Options"), _(" Options dialog")))
+        self.Bind(wx.EVT_MENU, lambda *e: PronterOptions(self), m.Append(-1, _("&Options"), _(" Options Dialog")))
 
-        self.Bind(wx.EVT_MENU, lambda x: threading.Thread(target = lambda: self.do_slice("set")).start(), m.Append(-1, _("Slicing settings"), _(" Adjust slicing settings")))
+        self.Bind(wx.EVT_MENU, lambda x: threading.Thread(target = lambda: self.do_slice("set")).start(),
+                  m.Append(-1, _("Slicing Settings"), _(" Adjust slicing settings")))
 
         mItem = m.AppendCheckItem(-1, _("Debug communications"),
                                   _("Print all G-code sent to and received from the printer."))
@@ -866,13 +871,22 @@ class PronterWindow(MainWindow, pronsole.pronsole):
         self.SetMenuBar(self.menustrip)
 
         m = wx.Menu()
+        self.Bind(wx.EVT_MENU, self.system_info,
+                  m.Append(-1, _("&System Information"),
+                           _("Sums up debugging information about the system and Printrun")))
+        self.Bind(wx.EVT_MENU, self.open_settings_dir,
+                  m.Append(-1, _("&Open Settings Directory"),
+                           _("Opens the directory that contains the Printrun settings file")))
+        self.menu_update = m.Append(-1, _("&Check for Update"),
+                                    _("Checks if there is a new version of Printrun on GitHub"))
+        self.Bind(wx.EVT_MENU, self.check_update, self.menu_update)
+        m.Append(-1, kind=wx.ITEM_SEPARATOR)
         self.Bind(wx.EVT_MENU, self.about,
-                  m.Append(-1, _("&About Printrun"), _("Show about dialog")))
+                  m.Append(-1, _("&About Printrun"), _("Show About dialog")))
         self.menustrip.Append(m, _("&Help"))
 
     def project(self, event):
         """Start Projector tool"""
-        from printrun import projectlayer
         projectlayer.SettingsFrame(self, self.p).Show()
 
     def exclude(self, event):
@@ -881,7 +895,6 @@ class PronterWindow(MainWindow, pronsole.pronsole):
             wx.CallAfter(self.statusbar.SetStatusText, _("No file loaded. Please use load first."))
             return
         if not self.excluder:
-            from .excluder import Excluder
             self.excluder = Excluder()
         self.excluder.pop_window(self.fgcode, bgcolor = self.bgcolor,
                                  build_dimensions = self.build_dimensions_list)
@@ -890,8 +903,39 @@ class PronterWindow(MainWindow, pronsole.pronsole):
         """Show Spool Manager Window"""
         spoolmanager_gui.SpoolManagerMainWindow(self, self.spool_manager).Show()
 
+    def system_info(self, event):
+        """Show System Info Dialog"""
+        for window in self.GetChildren():
+            if isinstance(window, about.SystemInfo):
+                window.Show()
+                window.Raise()
+                return
+        about.SystemInfo(self, self.settings.log_path).Show()
+
+    def open_settings_dir(self, event):
+        """Open the settings directory"""
+        about.open_rc_dir()
+
+    def check_update(self, event):
+        """Check for an update on GitHub"""
+        status = about.check_update(self)
+        if status == 0:
+            self.menu_update.SetItemLabel(_("You are up-to-date"))
+            self.menu_update.Enable(False)
+        elif status == 1:
+            self.menu_update.SetItemLabel(_("Update available!"))
+        else:
+            self.menu_update.SetItemLabel(_("Update: Connection failed"))
+
     def about(self, event):
-        about.AboutDialog(self.settings.total_filament_used)
+        """Show the About Printrun Window"""
+        printed = self.settings.total_filament_used
+        for window in self.GetChildren():
+            if isinstance(window, about.AboutDialog):
+                # Raise() does not work with AboutBox,
+                # therefore we will just reopen it.
+                window.DestroyChildren()
+        about.AboutDialog(self, printed)
 
     #  --------------------------------------------------------------
     #  Settings & command line handling (including update callbacks)
@@ -2360,7 +2404,6 @@ class PronterWindow(MainWindow, pronsole.pronsole):
 
     def read_slic3r_config(self, configfile, parser = None):
         """Helper to read a Slic3r configuration file"""
-        import configparser
         parser = configparser.RawConfigParser()
 
         class add_header:
@@ -2376,7 +2419,6 @@ class PronterWindow(MainWindow, pronsole.pronsole):
                     return self.f.readline()
 
             def __iter__(self):
-                import itertools
                 return itertools.chain([self.header], iter(self.f))
 
         parser.read_file(add_header(open(configfile)), configfile)
