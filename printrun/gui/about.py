@@ -29,7 +29,6 @@ except ImportError:
     import json  # To load the response of api.github
 from pkg_resources import parse_version  # Used to compare version numbers
 import webbrowser  # Used to open github/releases
-
 import wx
 import wx.adv  # Contains AboutDialogInfo()
 import psutil  # Provides RAM information
@@ -114,7 +113,6 @@ class AboutDialog(wx.Dialog):
                   'Maja M. @SparkyCola',
                   'Francesco Santini @fsantini',
                   'Cristopher Olah @colah',
-
                   'Jeremy Kajikawa',
                   'Markus Hitter',
                   'SkateBoss',
@@ -171,6 +169,7 @@ class AboutDialog(wx.Dialog):
                   'Kyle Evans',
                   'Lenbok',
                   'Lukas Erlacher',
+                  'Matthias @neofelis2X',
                   'Michael Andresen @blddk',
                   'NeoTheFox',
                   'OhmEye',
@@ -279,7 +278,7 @@ class SystemInfo(wx.Dialog):
                 f"{platform.system()}, Kernel {platform.release()}\n"
                 # f"Windows {platform.win32_ver()}, {platform.win32_edition()}\n"
                 f"{platform.platform().replace('-', ', ')}\n"
-                f"Locale: {lang}, {encoding}\n"
+                f"Locale: {lang}, {encoding} (from locale.getlocale)\n"
                 f"RAM total: {mem.total / (1024 ** 2)} MB, used: {mem.percent} %\n"
                 f"------------------ Python ------------------\n"
                 f"Python {platform.python_version()} - {platform.python_revision()}\n"

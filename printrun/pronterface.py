@@ -896,7 +896,7 @@ class PronterWindow(MainWindow, pronsole.pronsole):
 
         m = wx.Menu()
         self.Bind(wx.EVT_MENU, self.system_info,
-                  m.Append(-1, _("&Support Information"),
+                  m.Append(-1, _("&System Information"),
                            _("Sums up debugging information about the system and Printrun")))
         self.Bind(wx.EVT_MENU, self.open_rc_dir,
                   m.Append(-1, _("&Open Settings Directory"),
@@ -938,7 +938,7 @@ class PronterWindow(MainWindow, pronsole.pronsole):
 
     def open_rc_dir(self, event):
         """Open the settings directory"""
-        def open_folder(arg):
+        def open_folder(arg: str):
             config_dir = os.path.join(user_config_dir("Printrun"))
             try:
                 subprocess.run([arg, config_dir], check = True)
