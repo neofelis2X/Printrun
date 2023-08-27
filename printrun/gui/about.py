@@ -13,7 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with Printrun.  If not, see <http://www.gnu.org/licenses/>.
 '''
-Provide menu entries of the 'Help' menubar.
+Provides menu items for the 'Help' menu bar.
     AboutDialog()
     SystemInfo()
     update_checker()
@@ -28,7 +28,7 @@ try:
 except ImportError:
     import json  # To load the response of api.github
 from pkg_resources import parse_version  # Used to compare version numbers
-import webbrowser  # Used to open github/releases
+import webbrowser  # Used to open the github/releases website
 import wx
 import wx.adv  # Contains AboutDialogInfo()
 import psutil  # Provides RAM information
@@ -58,8 +58,11 @@ class AboutDialog(wx.Dialog):
         description = ("      " + _("Printrun is a pure Python host software for") +
                        " " + _("3D printing and other types of CNC machines.") +
                        "      \n      " +
+                       _("Pronterface is Printrun's graphical user interface.") +
+                       "\n      " +
                        _("%.02f mm of filament have been extruded during prints.") %
-                       printed_filament)
+                       printed_filament
+                       )
         self.info.SetDescription(description)
 
         self.info.SetCopyright('(C) 2011 - 2023')
@@ -246,8 +249,8 @@ class SystemInfo(wx.Dialog):
         description = wx.StaticText(self, -1, message)
         self.infotext = wx.TextCtrl(self, -1, info,
                                     style = wx.TE_READONLY | wx.TE_MULTILINE | wx.TE_NOHIDESEL)
-        copy_button = wx.Button(self, -1, _("Select All"))
-        copy_button.Bind(wx.EVT_BUTTON, self.select_all)
+        copy_button = wx.Button(self, -1, _("Copy to Clipboard"))
+        copy_button.Bind(wx.EVT_BUTTON, self.copy_all)
 
         topsizer.Add(description, 0, wx.EXPAND | wx.ALL, get_space('minor'))
         topsizer.Add(self.infotext, 1, wx.EXPAND | wx.ALL, get_space('none'))
@@ -258,8 +261,9 @@ class SystemInfo(wx.Dialog):
         self.SetMinClientSize((description.GetBestSize()[0] + 16, 300))
         self.Layout()
 
-    def select_all(self, event):
+    def copy_all(self, event):
         self.infotext.SelectAll()
+        self.infotext.Copy()
         self.infotext.SetFocus()
 
     def collect_info(self):
@@ -272,10 +276,11 @@ class SystemInfo(wx.Dialog):
                 f"----------------- Printrum ----------------\n"
                 f"Printrun {printcore.__version__}, argv: {sys.argv[1:]}\n"
                 f"Log path: {self.log}\n"
-                f"wxPython {wx.version()}\n"
-                f"pyglet {pyglet_version}\n"
+                f"wxPython: {wx.version()}\n"
+                f"pyglet: {pyglet_version}\n"
                 f"------------------ System -----------------\n"
                 f"{platform.system()}, Kernel {platform.release()}\n"
+                # f"Processor: {platform.processor()}\n"
                 # f"Windows {platform.win32_ver()}, {platform.win32_edition()}\n"
                 f"{platform.platform().replace('-', ', ')}\n"
                 f"Locale: {lang}, {encoding} (from locale.getlocale)\n"
