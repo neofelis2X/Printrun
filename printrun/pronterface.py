@@ -212,30 +212,39 @@ class PronterWindow(MainWindow, pronsole.pronsole):
         self.p.z_feedrate = self.settings.z_feedrate
 
         self.panel.SetBackgroundColour(self.bgcolor)
+
+        # This section handles the old style of saving
+        # custom buttons in a custombtn.txt file.
         customdict = {}
         try:
-            exec(compile_file(configfile("custombtn.txt")), customdict)
-            if len(customdict["btns"]):
-                if not self.custombuttons:
-                    try:
-                        self.custombuttons = customdict["btns"]
-                        for n, button in enumerate(self.custombuttons):
-                            self.cbutton_save(n, button)
-                        os.rename("custombtn.txt", "custombtn.old")
-                        with open("custombtn.txt", 'w', encoding = 'utf-8') as rco:
-                            rco.write(_("# I moved all your custom buttons into .pronsolerc.\n"
-                                        "# Please don't add them here any more.\n# Backup of "
-                                        "your old buttons is in custombtn.old\n"))
-                    except IOError as x:
-                        logging.error(str(x))
-                else:
-                    logging.warning(_("Note!!! You have specified custom buttons in "
-                                      "both custombtn.txt and .pronsolerc"))
-                    logging.warning(_("Ignoring custombtn.txt. Remove all current "
-                                      "buttons to revert to custombtn.txt"))
+            # exec creates a dictionary from the file
+            exec(compile_file(configfile("custombtn.txt")), None, customdict)
+        except Exception:
+            logging.exception('Error handling custombtn.txt:')
 
-        except:
-            pass
+        if 'btns' in customdict and customdict['btns']:
+            if not self.custombuttons:
+                try:
+                    for id, btn in enumerate(customdict["btns"]):
+                        button_obj = SpecialButton(btn[0], btn[1], btn[2])
+                        self.cbutton_save(id, button_obj)
+                        self.custombuttons.append(button_obj)
+
+                    os.rename("custombtn.txt", "custombtn.old")
+                    with open("custombtn.txt", 'w', encoding = 'utf-8') as rco:
+                        rco.write(_("# I moved all your custom buttons into .pronsolerc.\n"
+                                    "# Please don't add them here any more.\n# Backup of "
+                                    "your old buttons is in custombtn.old\n"))
+
+                except IOError:
+                    logging.exception('Error handling custombtn.txt:')
+
+            else:
+                logging.warning(_("Note!!! You have specified custom buttons in "
+                                  "both custombtn.txt and .pronsolerc"))
+                logging.warning(_("Ignoring custombtn.txt. Remove all current "
+                                  "buttons to import custombtn.txt"))
+
         self.menustrip = wx.MenuBar()
         self.reload_ui()
         # disable all printer controls until we connect to a printer
