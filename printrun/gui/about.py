@@ -20,6 +20,7 @@ Provides menu items for the 'Help' menu bar.
 '''
 import sys
 import locale
+import logging
 
 import platform  # Basic hardware and os information
 from urllib import request, error  # Used to check for updates on api.github
@@ -293,7 +294,7 @@ class SystemInfo(wx.Dialog):
 
         return info
 
-def get_update(self):
+def check_update(self):
     '''Request the version on github and compare with this version
         :return: 0, No Update
         :return: 1, Update available
@@ -306,10 +307,17 @@ def get_update(self):
     try:
         with request.urlopen(request_) as response:
             gh_response = json.loads(response.read().decode("utf-8"))
-    except error.URLError:
+    except error.URLError as err:
+        if 'CERTIFICATE_VERIFY_FAILED' in str(err):
+            logging.warning("Update Checker: Could not connect to github.com " \
+                            "because required SSL certificates were not found. " \
+                            "Please try 'pip install certifi' to use this function.")
+        else:
+            logging.warning("Update Checker: Could not connect to github.com.")
+
         return 2  # Connection failed
 
-    gh_version = gh_response['name'].removeprefix('Printrun ')
+    gh_version = gh_response['name'].replace('Printrun ', '')
     if parse_version(gh_version) > parse_version(my_version):
         repo_url = "https://github.com/kliment/Printrun/releases"
         message = _("Printrun {0} is available on GitHub, \

@@ -1009,14 +1009,14 @@ class PronterWindow(MainWindow, pronsole.pronsole):
 
     def check_update(self, event):
         """Check for an update on GitHub"""
-        status = about.get_update(self)
+        status = about.check_update(self)
         if status == 0:
             self.menu_update.SetItemLabel(_("You are up-to-date"))
             self.menu_update.Enable(False)
         elif status == 1:
             self.menu_update.SetItemLabel(_("Update available!"))
         else:
-            self.menu_update.SetItemLabel(_("Connection failed"))
+            self.menu_update.SetItemLabel(_("Update: Connection failed"))
 
     def about(self, event):
         """Show the About Printrun Window"""
