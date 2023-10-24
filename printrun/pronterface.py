@@ -27,7 +27,6 @@ import logging
 import re
 import configparser
 import itertools
-from appdirs import user_config_dir  # Provides path to the settings directory
 
 try:
     import simplejson as json
@@ -35,7 +34,6 @@ except ImportError:
     import json
 
 from . import pronsole
-from . import printcore
 from . import stlplater as plater
 from . import gcodeplater as gcplater
 from .excluder import Excluder
@@ -67,10 +65,8 @@ except ImportError:
     logging.error(_("WX >= 4 is not installed. This program requires WX >= 4 to run."))
     raise
 
-winsize = (800, 500)
+winsize = (800, 530)
 layerindex = 0
-if os.name == "nt":
-    winsize = (800, 530)
 
 pronterface_quitting = False
 
@@ -495,8 +491,8 @@ class PronterWindow(MainWindow, pronsole.pronsole):
             if not isinstance(l, str) or not l:
                 l = str(self.htemp.GetValue().split()[0])
             l = l.lower().replace(", ", ".")
-            for i, temp in self.temps.items():
-                l = l.replace(i, temp)
+            for key, temp in self.temps.items():
+                l = l.replace(key, temp)
             f = float(l)
             if f >= 0:
                 if self.p.online:
@@ -516,8 +512,8 @@ class PronterWindow(MainWindow, pronsole.pronsole):
             if not isinstance(l, str) or not l:
                 l = str(self.btemp.GetValue().split()[0])
             l = l.lower().replace(", ", ".")
-            for i, temp in self.bedtemps.items():
-                l = l.replace(i, temp)
+            for key, temp in self.bedtemps.items():
+                l = l.replace(key, temp)
             f = float(l)
             if f >= 0:
                 if self.p.online:
@@ -715,11 +711,11 @@ class PronterWindow(MainWindow, pronsole.pronsole):
     def show_viz_window(self, event):
         if self.fgcode:
             self.gwindow.Show(True)
-            self.gwindow.SetToolTip(wx.ToolTip("Mousewheel zooms the "
-                                               "display\nShift / Mousewheel scrolls layers"))
+            self.gwindow.SetToolTip(wx.ToolTip("Mousewheel zooms the view\n"
+                                               "Shift + Mousewheel scrolls layers"))
             self.gwindow.Raise()
 
-    def setfeeds(self, e):
+    def setfeeds(self, event):
         self.feedrates_changed = True
         try:
             if self.efeedc is not None:
@@ -949,7 +945,7 @@ class PronterWindow(MainWindow, pronsole.pronsole):
         self.Bind(wx.EVT_MENU, self.system_info,
                   m.Append(-1, _("&System Information"),
                            _("Sums up debugging information about the system and Printrun")))
-        self.Bind(wx.EVT_MENU, self.open_rc_dir,
+        self.Bind(wx.EVT_MENU, self.open_settings_dir,
                   m.Append(-1, _("&Open Settings Directory"),
                            _("Opens the directory that contains the Printrun settings file")))
         self.menu_update = m.Append(-1, _("&Check for Update"),
@@ -997,24 +993,9 @@ class PronterWindow(MainWindow, pronsole.pronsole):
                 return
         about.SystemInfo(self, self.settings.log_path).Show()
 
-    def open_rc_dir(self, event):
+    def open_settings_dir(self, event):
         """Open the settings directory"""
-        def open_folder(arg: str):
-            config_dir = os.path.join(user_config_dir("Printrun"))
-            try:
-                subprocess.run([arg, config_dir], check = True)
-            except FileNotFoundError:
-                logging.info(_("Opening the directory failed. "
-                               "Please try to open the path manually:"))
-                logging.info(config_dir)
-
-        platformname = platform.system()
-        if platformname == 'Windows':
-            open_folder('explorer')
-        elif platformname == 'Darwin':
-            open_folder('open')
-        else:  # Linux
-            open_folder('xdg-open')
+        about.open_rc_dir()
 
     def check_update(self, event):
         """Check for an update on GitHub"""
@@ -1525,16 +1506,21 @@ class PronterWindow(MainWindow, pronsole.pronsole):
     def slice_func(self):
         try:
             output_filename = self.model_to_gcode_filename(self.filename)
-            pararray = prepare_command(self.settings.slicecommandpath + self.settings.slicecommand,
+            pararray = prepare_command(self.settings.slicecommandpath +
+                                       self.settings.slicecommand,
                                        {"$s": self.filename, "$o": output_filename})
             if self.settings.slic3rintegration:
                 for cat, config in self.slic3r_configs.items():
                     if config:
                         fpath = os.path.join(self.slic3r_configpath, cat, config)
+                        # FIXME: macOS - It seems that Slic3r has a
+                        # problem with whitespaces in the path.
                         pararray += ["--load", fpath]
             self.log(_("Running ") + " ".join(pararray))
-            with subprocess.Popen(pararray, stdin=subprocess.DEVNULL, stderr = subprocess.STDOUT,
-                                  stdout = subprocess.PIPE, universal_newlines = True) as self.slicep:
+            with subprocess.Popen(pararray, stdin=subprocess.DEVNULL,
+                                  stderr = subprocess.STDOUT,
+                                  stdout = subprocess.PIPE,
+                                  universal_newlines = True) as self.slicep:
                 while True:
                     o = self.slicep.stdout.read(1)
                     if o == '' and self.slicep.poll() is not None:

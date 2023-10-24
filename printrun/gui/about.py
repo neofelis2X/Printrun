@@ -21,7 +21,10 @@ Provides menu items for the 'Help' menu bar.
 import sys
 import locale
 import logging
+import os
+import subprocess
 
+from datetime import date  # Write current year into About
 import platform  # Basic hardware and os information
 from urllib import request, error  # Used to check for updates on api.github
 try:
@@ -37,6 +40,7 @@ from pyglet import version as pyglet_version
 
 from printrun import printcore  # Needed for Printrun __version__
 from printrun.utils import iconfile, install_locale
+from appdirs import user_config_dir  # Provides path to the settings directory
 from .widgets import get_space
 
 install_locale('pronterface')
@@ -56,17 +60,19 @@ class AboutDialog(wx.Dialog):
         self.info.SetName('Printrun')
         self.info.SetVersion(printcore.__version__)
 
-        description = ("      " + _("Printrun is a pure Python host software for") +
-                       " " + _("3D printing and other types of CNC machines.") +
-                       "      \n      " +
+        description = ("              " +
+                       _("Printrun is a pure Python host software for") +
+                       "          \n           " +
+                       _("3D printing and other types of CNC machines.") +
+                       "          \n         " +
                        _("Pronterface is Printrun's graphical user interface.") +
-                       "\n      " +
+                       "          \n      " +
                        _("%.02f mm of filament have been extruded during prints.") %
-                       printed_filament
-                       )
+                       printed_filament)
+
         self.info.SetDescription(description)
 
-        self.info.SetCopyright('(C) 2011 - 2023')
+        self.info.SetCopyright(f'(C) 2011 - {date.today().year}')
         self.info.SetWebSite('https://github.com/kliment/Printrun')
 
         self.info.SetLicence(self.LICENCE)
@@ -294,7 +300,27 @@ class SystemInfo(wx.Dialog):
 
         return info
 
-def check_update(self):
+
+def open_rc_dir():
+    """Open the settings directory"""
+    def open_folder(arg: str):
+        config_dir = os.path.join(user_config_dir("Printrun"))
+        try:
+            subprocess.run([arg, config_dir], check = True)
+        except FileNotFoundError:
+            logging.info(_("Opening the directory failed. "
+                           "Please try to open the path manually:"))
+            logging.info(config_dir)
+
+    platformname = platform.system()
+    if platformname == 'Windows':
+        open_folder('explorer')
+    elif platformname == 'Darwin':
+        open_folder('open')
+    else:  # Linux
+        open_folder('xdg-open')
+
+def check_update(parent):
     '''Request the version on github and compare with this version
         :return: 0, No Update
         :return: 1, Update available
@@ -324,7 +350,7 @@ def check_update(self):
                     \nyou are using version {1}.\nWould you like to open \
                     {2} to download it?").format(gh_version, my_version, repo_url)
 
-        dlg = wx.MessageDialog(self, message,
+        dlg = wx.MessageDialog(parent, message,
                                _("Update available!"),
                                wx.YES_NO | wx.NO_DEFAULT | wx.ICON_NONE
                                )
@@ -334,7 +360,7 @@ def check_update(self):
         return 1  # Update available
 
     message = _("Printrun {0} is the latest version.").format(my_version)
-    dlg = wx.MessageDialog(self, message,
+    dlg = wx.MessageDialog(parent, message,
                             _("You are up-to-date."),
                             wx.OK | wx.ICON_NONE
                             )
