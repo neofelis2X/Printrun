@@ -812,7 +812,7 @@ class PronterWindow(MainWindow, pronsole.pronsole):
 
         # File menu
         m = wx.Menu()
-        self.Bind(wx.EVT_MENU, self.loadfile, m.Append(-1, _("&Open...\tCtrl+O"), _(" Open file")))
+        self.Bind(wx.EVT_MENU, self.loadfile, m.Append(-1, _("&Open...")+"\tCtrl+O", _(" Open file")))
         self.savebtn = m.Append(-1, _("&Save..."), _(" Save file"))
         self.savebtn.Enable(False)
         self.Bind(wx.EVT_MENU, self.savefile, self.savebtn)
@@ -823,7 +823,7 @@ class PronterWindow(MainWindow, pronsole.pronsole):
         self.Bind(wx.EVT_MENU_RANGE, self.load_recent_file,
                   id = wx.ID_FILE1, id2 = wx.ID_FILE9)
         m.Append(wx.ID_ANY, _("&Recent Files"), recent)
-        self.Bind(wx.EVT_MENU, self.clear_log, m.Append(-1, _("Clear console\tCtrl+L"), _(" Clear output console")))
+        self.Bind(wx.EVT_MENU, self.clear_log, m.Append(-1, _("Clear console")+"\tCtrl+L", _(" Clear output console")))
         self.Bind(wx.EVT_MENU, self.on_exit, m.Append(wx.ID_EXIT, _("E&xit"), _(" Closes the Window")))
         self.menustrip.Append(m, _("&File"))
 
@@ -930,7 +930,7 @@ class PronterWindow(MainWindow, pronsole.pronsole):
                        % self.settings.total_filament_used
 
         info.SetDescription(description)
-        info.SetCopyright('(C) 2011 - 2020')
+        info.SetCopyright('(C) 2011 - 2024')
         info.SetWebSite('https://github.com/kliment/Printrun')
 
         licence = """\
@@ -955,6 +955,7 @@ Printrun. If not, see <http://www.gnu.org/licenses/>."""
         info.AddDeveloper('Miro Hrončok @hroncok (code, packaging)')
         info.AddDeveloper('Rob Gilson @D1plo1d (code)')
         info.AddDeveloper('Gary Hodgson @garyhodgson (code)')
+        info.AddDeveloper('Neofelis @neofelis2X (code)')
         info.AddDeveloper('Duane Johnson (code,graphics)')
         info.AddDeveloper('Alessandro Ranellucci @alranel (code)')
         info.AddDeveloper('Travis Howse @tjhowse (code)')
@@ -1281,12 +1282,16 @@ Printrun. If not, see <http://www.gnu.org/licenses/>."""
                 status_string += _(" Z: %.3f mm") % self.curlayer
                 if self.settings.display_progress_on_printer and time.time() - self.printer_progress_time >= self.settings.printer_progress_update_interval:
                     self.printer_progress_time = time.time()
-                    printer_progress_string = "M117 " + str(round(100 * float(self.p.queueindex) / len(self.p.mainqueue), 2)) + "% Est " + format_duration(secondsremain)
-                    # ":" seems to be some kind of separator for G-CODE"
-                    self.p.send_now(printer_progress_string.replace(":", "."))
-                    if len(printer_progress_string) > 25:
-                        logging.info("Warning: The print progress message might be too long to be displayed properly")
-                    # 13 chars for up to 99h est.
+                    if self.p.mainqueue is not None:
+                        # Don't try to calculate the printer_progress_string with a None value of self.p.mainqueue.
+                        # This happens in combination with self.p.queueindex = 0
+                        # We pass the calculation and try it next time.
+                        printer_progress_string = "M117 " + str(round(100 * float(self.p.queueindex) / len(self.p.mainqueue), 2)) + "% Est " + format_duration(secondsremain)
+                        # ":" seems to be some kind of separator for G-CODE"
+                        self.p.send_now(printer_progress_string.replace(":", "."))
+                        if len(printer_progress_string) > 25:
+                            logging.info(_("Warning: The print progress message might be too long to be displayed properly"))
+                        # 13 chars for up to 99h est.
         elif self.loading_gcode:
             status_string = self.loading_gcode_message
         wx.CallAfter(self.statusbar.SetStatusText, status_string)
@@ -1456,7 +1461,7 @@ Printrun. If not, see <http://www.gnu.org/licenses/>."""
             return
         if not self.p.online:
             return
-        dlg = wx.TextEntryDialog(self, ("Enter a target filename in 8.3 format:"), _("Pick SD filename"), dosify(self.filename))
+        dlg = wx.TextEntryDialog(self, _("Enter a target filename in 8.3 format:"), _("Pick SD filename"), dosify(self.filename))
         if dlg.ShowModal() == wx.ID_OK:
             self.p.send_now("M21")
             self.p.send_now("M28 " + str(dlg.GetValue()))
@@ -1753,9 +1758,9 @@ Printrun. If not, see <http://www.gnu.org/licenses/>."""
         remainder = self.spool_manager.getRemainingFilament(extruder) - length
         minimum_warning_length = 1000.0
         if remainder < minimum_warning_length:
-            self.log(_("\nWARNING: Currently loaded spool for extruder " +
-            "%d will likely run out of filament during the print.\n" %
-            extruder))
+            self.log(_("\nWARNING: Currently loaded spool for extruder ") +
+                     _("%d will likely run out of filament during the print.\n") 
+                     % extruder)
         return remainder
 
     def output_gcode_stats(self):
@@ -1892,7 +1897,7 @@ Printrun. If not, see <http://www.gnu.org/licenses/>."""
     def online_gui(self):
         """Callback when printer goes online (graphical bits)"""
         self.connectbtn.SetLabel(_("Dis&connect"))
-        self.connectbtn.SetToolTip(wx.ToolTip("Disconnect from the printer"))
+        self.connectbtn.SetToolTip(wx.ToolTip(_("Disconnect from the printer")))
         self.connectbtn_cb_var = self.disconnect
 
         if hasattr(self, "extrudersel"):
@@ -2063,7 +2068,7 @@ Printrun. If not, see <http://www.gnu.org/licenses/>."""
                 if len(command) == 2 and command[0] == "action":
                     command = command[1]
                     self.log(_("Received command %s") % command)
-                    if command == "pause":
+                    if command in ["pause", "cancel"]:
                         if not self.paused:
                             wx.CallAfter(self.pause)
                         return True
@@ -2562,7 +2567,7 @@ Printrun. If not, see <http://www.gnu.org/licenses/>."""
                 import itertools
                 return itertools.chain([self.header], iter(self.f))
 
-        parser.readfp(add_header(open(configfile)), configfile)
+        parser.read_file(add_header(open(configfile)), configfile)
         return parser
 
     def set_slic3r_config(self, configfile, cat, file):

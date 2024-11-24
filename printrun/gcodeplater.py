@@ -92,7 +92,7 @@ class GcodePlaterPanel(PlaterPanel):
         self.set_viewer(viewer)
         self.Layout()
         self.SetMinClientSize(self.topsizer.CalcMin())
-        self.SetTitle("G-Code Plate Builder")
+        self.SetTitle(_("G-Code Plate Builder"))
 
     def get_objects(self):
         return list(self.models.values())

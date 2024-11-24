@@ -59,7 +59,7 @@ available at: https://github.com/kliment/Printrun/releases/latest
 > **Note for OSX users**: if OSX tells you `"pronterface.app" cannot be opened
 > because the developer cannot be verified.`, you don't need to re-download
 > it. Instead, you need to allow OSX to run the unsigned app. To do this,
-> right click the application in Finder and select `Open`. Then click `Open`
+> right- or ctrl click the application in Finder and select `Open`. Then click `Open`
 > in the popup window that appears. You only need to do this once.
 
 
@@ -75,7 +75,7 @@ Or only the apps you need: `sudo apt install pronsole` or `pronterface` or
 
 #### Chrome OS
 
-You can use Printrun via crouton ( https://github.com/dnschneid/crouton ). Assuming you want Ubuntu Trusty, you used probably `sudo sh -e ~/Downloads/crouton -r trusty -t xfce` to install Ubuntu. Fetch and install printrun with the line given above for Ubuntu/Debian.
+You can use Printrun via [crouton](https://github.com/dnschneid/crouton). Assuming you want Ubuntu Trusty, you used probably `sudo sh -e ~/Downloads/crouton -r trusty -t xfce` to install Ubuntu. Fetch and install printrun with the line given above for Ubuntu/Debian.
 
 By default you have no access to the serial port under Chrome OS crouton, so you cannot connect to your 3D printer. Add yourself to the serial group within the linux environment to fix this
 
@@ -163,17 +163,15 @@ $ source venv/bin/activate  # activate the virtual environment
 > **Note for Ubuntu/Debian**: You might need to install `python3-venv` first.
 
 > **Note for Ubuntu/Debian**: If you get `python: command not found` use
-> `python3` instead of just `python` on all commands below.
+> `python3 -m venv venv` instead.
 
 
-#### 4. Install dependencies
+#### 4. Install Printrun
 
-Dependencies for running Printrun are laid out in the [`requirements.txt`][5]
-file. Once activated your virtual environment, install required dependencies
-with:
+Once activated your virtual environment, install Printrun' source code with:
 
 ```
-(venv) $ python -m pip install -r requirements.txt  # install the rest of dependencies
+(venv) $ python -m pip install .
 ```
 
 > **Note for Linux users**: wxPython4 doesn't have Linux wheels available from
@@ -186,32 +184,15 @@ with:
 > (venv) $ python -m pip install https://extras.wxpython.org/wxPython4/extras/linux/gtk3/fedora-27/wxPython-4.0.1-cp36-cp36m-linux_x86_64.whl  # replace the link with yours
 > ```
 
-[5]: requirements.txt
 [6]: https://extras.wxpython.org/wxPython4/extras/linux/gtk3
 
 
-#### 5. (Optional) Cython-based G-Code parser
-
-Printrun default G-Code parser is quite memory hungry, but we also provide a
-much lighter one which just needs an extra build-time dependency (Cython). The
-warning message `WARNING:root:Memory-efficient GCoder implementation
-unavailable: No module named gcoder_line` means that this optimized G-Code
-parser hasn't been compiled. To get rid of it and benefit from the better
-implementation, install Cython and build the extension with the following
-commands:
-
-```console
-(venv) $ python -m pip install Cython
-(venv) $ python setup.py build_ext --inplace
-```
-
-
-#### 6. Run Printrun
+#### 5. Run Printrun
 
 With your virtual environment still active, invoke the app you need like:
 
 ```shell
-(venv) $ python pronterface.py  # or `pronsole.py` or `plater.py`
+(venv) $ pronterface.py  # or `pronsole.py` or `plater.py`
 ```
 
 
@@ -225,7 +206,6 @@ CMD
 ```cmd
 > git clone https://github.com/kliment/Printrun.git
 > cd Printrun
-> git submodule update --init --recursive
 > release_windows.bat
 ```
 
@@ -233,15 +213,18 @@ PowerShell:
 ```ps
 > git clone https://github.com/kliment/Printrun.git
 > cd Printrun
-> git submodule update --init --recursive
 > ./release_windows.bat
 ```
 
-The script above will clone this repository and the submodule PrintrunGTK3. The script 'release_windows.bat' will install a virtual environment named v3, download all needed python libraries and compile the binaries for Pronterface.exe and Pronsole.exe.
-You will find the files in the new created directory 'dist'. You will find further and more detailed information in the script release_windows.bat. Further information for the linked submodul: [PrintrunGTK3](https://github.com/DivingDuck/PrintrunGTK3)
+The script above will clone this repository. The script `release_windows.bat` will install a virtual environment named v3, download all needed python libraries and compile the binaries for Pronterface.exe and Pronsole.exe.
+You will find the files in the new created directory `dist`. You will find further and more detailed information in the script `release_windows.bat`.
 Run Pronterface or Pronsole from the binary files or from source calling pronterface.py for the GUI version and pronsole.py for the commandline version.
 
-Run 'release_windows.bat' when ever you make changes or updates. With each new run it will compile the binaries and update all involved libraries in the virtual environment if needed. Delete the virtual environment if you have problems with it. Use 'git submodule update --init --recursive' for updating the submodule
+Running Pronsole works best by running it in WindowsTerminal. You can create a desktop shortcut link to the file pronsole.exe. Then edit the target for your shortcut as shown in belows example:
+`%LocalAppData%\Microsoft\WindowsApps\wt.exe --title Pronsole %USERPROFILE%\Downloads\pronterface-test\pronsole.exe`
+You need to adjust the path to your location of pronsole.exe.
+
+Run 'release_windows.bat' when ever you make changes or updates. With each new run it will compile the binaries and update all involved libraries in the virtual environment if needed. Delete the virtual environment if you have problems with it.
 
 
 # USING PRINTRUN
@@ -621,7 +604,7 @@ An enormous number of people helped make Printrun. See the list
 # LICENSE
 
 ```
-Copyright (C) 2011-2023 Kliment Yanev, Guillaume Seguin, and the other contributors listed in CONTRIBUTORS.md
+Copyright (C) 2011-2024 Kliment Yanev, Guillaume Seguin, and the other contributors listed in CONTRIBUTORS.md
 
 Printrun is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
