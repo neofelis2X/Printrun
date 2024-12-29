@@ -26,6 +26,7 @@ import logging
 from pathlib import Path
 
 import wx
+import wx.svg
 
 DATADIR = os.path.join(sys.prefix, 'share')
 
@@ -95,7 +96,7 @@ def setup_logging(out, filepath = None, reset_handlers = False):
 def get_iconbundle(iconname: str) -> wx.IconBundle:
     icons = wx.IconBundle()
     rel_path = os.path.join("assets", "icons", iconname)
-    base_filename = iconname.join("_32x32.png")
+    base_filename = iconname + "_32x32.png"
     bpath = os.path.dirname(imagefile(base_filename, rel_path))
     if not os.path.isdir(bpath):
         print('Warning: Icon "%s" not found.' % iconname)
@@ -105,6 +106,23 @@ def get_iconbundle(iconname: str) -> wx.IconBundle:
         if file.endswith(".png"):
             icons.AddIcon(os.path.join(bpath, file), wx.BITMAP_TYPE_PNG)
     return icons
+
+def toolbaricon(iconname: str) -> wx.Bitmap:
+    icons = wx.BitmapBundle()
+    rel_path = os.path.join("assets", "toolbar")
+
+    if wx.SystemSettings.GetAppearance().IsDark():
+        base_filename = iconname + "_w.svg"
+    else:
+        base_filename = iconname + ".svg"
+
+    svg_path = imagefile(base_filename, rel_path)
+
+    if not os.path.isfile(svg_path):
+        print('Warning: Toolbar icon "%s" not found.' % iconname)
+        return wx.NullBitmap
+
+    return icons.FromSVGFile(svg_path, (24, 24))
 
 def iconfile(filename):
     '''
