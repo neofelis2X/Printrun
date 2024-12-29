@@ -26,6 +26,8 @@ import logging
 
 from pathlib import Path
 
+import wx
+
 DATADIR = os.path.join(sys.prefix, 'share')
 
 
@@ -94,6 +96,20 @@ def setup_logging(out, filepath = None, reset_handlers = False):
         logging_handler.setFormatter(formatter)
         logger.addHandler(logging_handler)
 
+def get_iconbundle(iconname: str) -> wx.IconBundle:
+    icons = wx.IconBundle()
+    rel_path = os.path.join("assets", "icons", iconname)
+    base_filename = iconname.join("_32x32.png")
+    bpath = os.path.dirname(imagefile(base_filename, rel_path))
+    if not os.path.isdir(bpath):
+        print('Warning: Icon "%s" not found.' % iconname)
+        return icons
+    pngs = os.listdir(bpath)
+    for file in pngs:
+        if file.endswith(".png"):
+            icons.AddIcon(os.path.join(bpath, file), wx.BITMAP_TYPE_PNG)
+    return icons
+
 def iconfile(filename):
     '''
     Get the full path to filename by checking in standard icon locations
@@ -104,7 +120,7 @@ def iconfile(filename):
         return sys.executable
     return pixmapfile(filename)
 
-def imagefile(filename):
+def imagefile(filename, img_directory='images'):
     '''
     Get the full path to filename by checking standard image locations,
     those being possible locations of the pronterface "images" directory
@@ -116,19 +132,19 @@ def imagefile(filename):
         "pronterface"
     )  # Used by pip install
     image_dirs = [
-        os.path.join(DATADIR, 'pronterface', 'images'),
-        os.path.join(os.path.dirname(sys.argv[0]), "images"),
-        os.path.join(my_local_share, "images"),
+        os.path.join(DATADIR, 'pronterface', img_directory),
+        os.path.join(os.path.dirname(sys.argv[0]), img_directory),
+        os.path.join(my_local_share, img_directory),
         os.path.join(
             getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__))),
-            "images"
+            img_directory
         ),  # Check manually since lookup_file checks in frozen but not /images
     ]
     path = lookup_file(filename, image_dirs)
     if path == filename:
         # The file wasn't found in any known location, so use a relative
         #   path.
-        path = os.path.join("images", filename)
+        path = os.path.join(img_directory, filename)
     return path
 
 def lookup_file(filename, prefixes):
