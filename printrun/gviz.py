@@ -23,7 +23,7 @@ from .injectgcode import injector, injector_edit
 from printrun.gui.viz import BaseViz
 from .gui.widgets import get_space
 
-from .utils import imagefile, install_locale, get_home_pos
+from .utils import install_locale, get_home_pos, toolbaricon
 install_locale('pronterface')
 
 class GvizBaseFrame(wx.Frame):
@@ -51,21 +51,25 @@ class GvizBaseFrame(wx.Frame):
     def build_toolbar(self):
         self.toolbar.SetMargins(get_space('minor'), get_space('mini'))
         self.toolbar.SetToolPacking(get_space('minor'))
-        self.toolbar.AddTool(1, '', wx.Image(imagefile('zoom_out.png'), wx.BITMAP_TYPE_PNG).ConvertToBitmap(), _("Zoom Out [-]"))
-        self.toolbar.AddTool(2, '', wx.Image(imagefile('zoom_in.png'), wx.BITMAP_TYPE_PNG).ConvertToBitmap(), _("Zoom In [+]"),)
-        self.toolbar.AddTool(3, _("Reset View"), wx.Image(imagefile('fit.png'), wx.BITMAP_TYPE_PNG).ConvertToBitmap(),
+        self.toolbar.AddTool(1, '', toolbaricon('zoom_out'), _("Zoom Out [-]"))
+        self.toolbar.AddTool(2, '', toolbaricon('zoom_in'), _("Zoom In [+]"),)
+        self.toolbar.AddTool(3, _("Reset View"), toolbaricon('reset'),
                              shortHelp = _("Reset View [R]"))
         self.toolbar.AddSeparator()
-        self.toolbar.AddTool(4, '', wx.Image(imagefile('arrow_down.png'), wx.BITMAP_TYPE_PNG).ConvertToBitmap(), _("Move Down a Layer [D]"))
-        self.toolbar.AddTool(5, '', wx.Image(imagefile('arrow_up.png'), wx.BITMAP_TYPE_PNG).ConvertToBitmap(), _("Move Up a Layer [U]"))
+        self.toolbar.AddTool(4, '', toolbaricon('layer_down'),
+                             _("Move Down a Layer [D]"))
+        self.toolbar.AddTool(5, '', toolbaricon('layer_up'),
+                             _("Move Up a Layer [U]"))
         self.toolbar.AddSeparator()
-        self.toolbar.AddTool(6, _("Inject"), wx.Image(imagefile('inject.png'), wx.BITMAP_TYPE_PNG).ConvertToBitmap(),
-                             wx.NullBitmap, shortHelp = _("Inject G-Code"), longHelp = _("Insert code at the beginning of this layer"))
-        self.toolbar.AddTool(7, _("Edit"), wx.Image(imagefile('edit.png'), wx.BITMAP_TYPE_PNG).ConvertToBitmap(),
-                             wx.NullBitmap, shortHelp = _("Edit Layer"), longHelp = _("Edit the G-Code of this layer"))
+        self.toolbar.AddTool(6, _("Inject"), toolbaricon('inject'),
+                             wx.NullBitmap, shortHelp = _("Inject G-Code"),
+                             longHelp = _("Insert code at the beginning of this layer"))
+        self.toolbar.AddTool(7, _("Edit"), toolbaricon('edit'), wx.NullBitmap,
+                             shortHelp = _("Edit Layer"),
+                             longHelp = _("Edit the G-Code of this layer"))
         self.toolbar.AddStretchableSpace()
         self.toolbar.AddSeparator()
-        self.toolbar.AddTool(9, _("Close"), wx.Image(imagefile('fit.png'), wx.BITMAP_TYPE_PNG).ConvertToBitmap(),
+        self.toolbar.AddTool(9, _("Close"), toolbaricon('exit'),
                              shortHelp = _("Close Window"))
 
     def setlayercb(self, layer):
