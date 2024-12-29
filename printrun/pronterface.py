@@ -36,8 +36,8 @@ from printrun.spoolmanager import spoolmanager_gui
 from .utils import install_locale, setup_logging, dosify, \
     iconfile, format_time, format_duration, \
     hexcolor_to_float, parse_temperature_report, \
-    prepare_command, check_rgb_color, check_rgba_color, compile_file, \
-    write_history_to, read_history_from
+    prepare_command, compile_file, write_history_to, read_history_from, \
+    get_iconbundle
 install_locale('pronterface')
 
 try:
@@ -188,7 +188,7 @@ class PronterWindow(MainWindow, pronsole.pronsole):
         MainWindow.__init__(self, None, title = _("Pronterface"), size = size)
         if self.settings.last_window_maximized:
             self.Maximize()
-        self.SetIcon(wx.Icon(iconfile("pronterface.png"), wx.BITMAP_TYPE_PNG))
+        self.SetIcons(get_iconbundle("pronterface"))
         self.Bind(wx.EVT_SIZE, self.on_resize)
         self.Bind(wx.EVT_MAXIMIZE, self.on_maximize)
         self.window_ready = True
@@ -894,7 +894,7 @@ class PronterWindow(MainWindow, pronsole.pronsole):
 
         info = wx.adv.AboutDialogInfo()
 
-        info.SetIcon(wx.Icon(iconfile("pronterface.png"), wx.BITMAP_TYPE_PNG))
+        info.SetIcon(get_iconbundle("pronterface").GetIcon((128, 128)))
         info.SetName('Printrun')
         info.SetVersion(printcore.__version__)
 

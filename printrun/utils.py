@@ -25,6 +25,8 @@ import locale
 import logging
 from pathlib import Path
 
+import wx
+
 DATADIR = os.path.join(sys.prefix, 'share')
 
 
@@ -90,6 +92,19 @@ def setup_logging(out, filepath = None, reset_handlers = False):
         logging_handler.setFormatter(formatter)
         logger.addHandler(logging_handler)
 
+def get_iconbundle(iconname: str) -> wx.IconBundle:
+    icons = wx.IconBundle()
+    rel_path = os.path.join("assets", "icons", iconname)
+    base_filename = iconname.join("_32x32.png")
+    bpath = os.path.dirname(imagefile(base_filename, rel_path))
+    if not os.path.isdir(bpath):
+        print('Warning: Icon "%s" not found.' % iconname)
+        return icons
+    pngs = os.listdir(bpath)
+    for file in pngs:
+        if file.endswith(".png"):
+            icons.AddIcon(os.path.join(bpath, file), wx.BITMAP_TYPE_PNG)
+    return icons
 
 def iconfile(filename):
     '''
@@ -101,14 +116,14 @@ def iconfile(filename):
         return sys.executable
     return pixmapfile(filename)
 
-
-def imagefile(filename):
+def imagefile(filename, img_directory="images"):
     '''
     Get the full path to filename by checking standard image locations,
     those being possible locations of the pronterface "images" directory
     (See the lookup_file function's documentation for behavior).
     '''
-    return lookup_file(filename, ["images", "pronterface/images"])
+
+    return lookup_file(filename, [img_directory, "pronterface/" + img_directory])
 
 
 def lookup_file(filename, folders=None, locations=None):
@@ -322,3 +337,4 @@ def write_history_to(history_file, history_list):
     with history_file.open('w', encoding='utf-8') as hf:
         for item in history_list:
             hf.write(item + '\n')
+
