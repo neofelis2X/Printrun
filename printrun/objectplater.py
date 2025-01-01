@@ -366,7 +366,7 @@ class Plater(wx.Dialog):
             del kwargs["size"]
         wx.Dialog.__init__(self, parent, title = _("STL Plate Builder"),
                            size = size, style = wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER)
-        self.SetIcons(get_iconbundle("stl_plater"))
+        self.SetIcons(get_iconbundle("pronterface"))
         self.prepare_ui(**kwargs)
         self.CenterOnParent()
 

@@ -31,11 +31,10 @@ python setup.py build_ext --inplace
 ### For packaging
 ```
 pip install pyinstaller
-pyi-makespec --hidden-import="pkg_resources.py2_warn" -F --add-data images/\*:images --add-data \*.png:. --add-data \*.ico:. -w -i P-face.icns pronterface.py
+pyi-makespec --hidden-import="pkg_resources.py2_warn" -F -n "Pronterface" --add-data images/\*:images --add-data assets/toolbar/\*.svg:assets/toolbar --add-data assets/icons/pronterface/\*.png:assets/icons/pronterface -w -i "./assets/icons/pronterface.icns" pronterface.py
 rm -rf dist
-sed -i '' '$ s/.$//' pronterface.spec
-cat >> pronterface.spec <<EOL
-,
+sed -i '' '$ s/.$//' Pronterface.spec
+cat >> Pronterface.spec <<EOL
 info_plist={
     'NSPrincipalClass': 'NSApplication',
     'NSAppleScriptEnabled': False,
@@ -43,8 +42,8 @@ info_plist={
   },
 )
 EOL
-pyinstaller --clean pronterface.spec -y
-(optional) codesign -s identityname dist/pronterface.app --deep
+pyinstaller --clean Pronterface.spec -y
+(optional) codesign -s identityname dist/Pronterface.app --deep
 ```
 
 ## Setup on Windows
@@ -82,8 +81,8 @@ Please see remark for polygon3[^1]
 ### For packaging
 ```
 pip install pyinstaller
-pyi-makespec -F --add-data images/*;images --add-data *.png;. --add-data *.ico;. -w -i pronterface.ico pronterface.py
-pyinstaller --clean pronterface.spec -y
+pyi-makespec -F -n "Pronterface" --add-data images/*;images --add-data assets/icons/pronterface/*.png;assets/icons/pronterface --add-data assets/toolbar/*.svg;assets/toolbar -w -i "./assets/icons/pronterface.ico" pronterface.py
+pyinstaller --clean Pronterface.spec -y
 ```
 
 > [!TIP]
