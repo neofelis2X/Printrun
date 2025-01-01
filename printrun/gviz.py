@@ -72,6 +72,19 @@ class GvizBaseFrame(wx.Frame):
         self.toolbar.AddTool(9, _("Close"), toolbaricon('exit'),
                              shortHelp = _("Close Window"))
 
+    def update_toolbar_icons(self, event):
+        # FIXME: It works for the excluder window but not for the gviz.
+        self.toolbar.SetToolNormalBitmap(1, toolbaricon('zoom_out'))
+        self.toolbar.SetToolNormalBitmap(2, toolbaricon('zoom_in'))
+        self.toolbar.SetToolNormalBitmap(3, toolbaricon('reset'))
+        self.toolbar.SetToolNormalBitmap(4, toolbaricon('layer_down'))
+        self.toolbar.SetToolNormalBitmap(5, toolbaricon('layer_up'))
+        self.toolbar.SetToolNormalBitmap(6, toolbaricon('inject'))
+        self.toolbar.SetToolNormalBitmap(7, toolbaricon('edit'))
+        self.toolbar.SetToolNormalBitmap(8, toolbaricon('reset'))
+        self.toolbar.SetToolNormalBitmap(9, toolbaricon('exit'))
+        self.toolbar.SetToolNormalBitmap(10, toolbaricon('fit'))
+
     def setlayercb(self, layer):
         self.layerslider.SetValue(layer)
 
@@ -108,6 +121,7 @@ class GvizWindow(GvizBaseFrame):
         self.Bind(wx.EVT_TOOL, lambda x: self.p.editlayer(), id = 7)
         self.Bind(wx.EVT_TOOL, self.reset_selection, id = 8)
         self.Bind(wx.EVT_TOOL, lambda x: self.Close(), id = 9)
+        self.Bind(wx.EVT_SYS_COLOUR_CHANGED, self.update_toolbar_icons)
 
         self.initpos = None
         self.p.Bind(wx.EVT_KEY_DOWN, self.key)

@@ -97,21 +97,24 @@ def get_iconbundle(iconname: str) -> wx.IconBundle:
     icons = wx.IconBundle()
     rel_path = os.path.join("assets", "icons", iconname)
     base_filename = iconname + "_32x32.png"
-    bpath = os.path.dirname(imagefile(base_filename, rel_path))
-    if not os.path.isdir(bpath):
+    png_path = os.path.dirname(imagefile(base_filename, rel_path))
+    if not os.path.isdir(png_path):
         print('Warning: Icon "%s" not found.' % iconname)
         return icons
-    pngs = os.listdir(bpath)
+    pngs = os.listdir(png_path)
     for file in pngs:
-        if file.endswith(".png"):
-            icons.AddIcon(os.path.join(bpath, file), wx.BITMAP_TYPE_PNG)
+        if file.endswith(".png") and "@2x" not in file and "x512" not in file:
+            icons.AddIcon(os.path.join(png_path, file), wx.BITMAP_TYPE_PNG)
+
     return icons
 
 def toolbaricon(iconname: str) -> wx.Bitmap:
     icons = wx.BitmapBundle()
     rel_path = os.path.join("assets", "toolbar")
 
-    if wx.SystemSettings.GetAppearance().IsDark():
+    # On windows the application is light grey, even in 'dark mode',
+    # therefore on windows we always use the dark icons on bright background.
+    if wx.SystemSettings.GetAppearance().IsDark() and wx.PlatformId() != "msw":
         base_filename = iconname + "_w.svg"
     else:
         base_filename = iconname + ".svg"
