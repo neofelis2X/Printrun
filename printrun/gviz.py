@@ -23,7 +23,7 @@ from .injectgcode import injector, injector_edit
 from printrun.gui.viz import BaseViz
 from .gui.widgets import get_space
 
-from .utils import install_locale, get_home_pos, toolbaricon
+from .utils import install_locale, get_home_pos, toolbaricon, get_iconbundle
 install_locale('pronterface')
 
 class GvizBaseFrame(wx.Frame):
@@ -31,6 +31,7 @@ class GvizBaseFrame(wx.Frame):
     def create_base_ui(self):
         self.CreateStatusBar(1)
         self.SetStatusText(_("Layer number and Z position show here when you scroll"))
+        self.SetIcons(get_iconbundle("pronterface"))
 
         panel = wx.Panel(self, -1)
         v_sizer = wx.BoxSizer(wx.VERTICAL)
