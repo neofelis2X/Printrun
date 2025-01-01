@@ -384,7 +384,7 @@ class SpoolManagerAddWindow(wx.Dialog):
 
         self.parent = parent
 
-        self.SetIcon(parent.GetIcon())
+        self.SetIcons(parent.GetIcons())
 
         # Generate the dialogs
         # The wx.TextCtrl variabels need to be declared before the loop, empty
@@ -554,7 +554,7 @@ class SpoolManagerEditWindow(wx.Dialog):
 
         self.parent = parent
 
-        self.SetIcon(parent.GetIcon())
+        self.SetIcons(parent.GetIcons())
 
         self.old_spool_name = spool_name
         self.old_spool_length = getFloat(self, spool_length.replace(" mm", ""))
