@@ -114,7 +114,8 @@ def toolbaricon(iconname: str) -> wx.Bitmap:
 
     # On windows the application is light grey, even in 'dark mode',
     # therefore on windows we always use the dark icons on bright background.
-    if wx.SystemSettings.GetAppearance().IsDark() and wx.PlatformId() != "msw":
+    if wx.SystemSettings.GetAppearance().IsDark() and \
+        wx.PlatformInformation().Get().GetOperatingSystemFamilyName() != "Windows":
         base_filename = iconname + "_w.svg"
     else:
         base_filename = iconname + ".svg"
