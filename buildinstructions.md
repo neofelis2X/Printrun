@@ -31,7 +31,7 @@ python setup.py build_ext --inplace
 ### For packaging
 ```
 pip install pyinstaller
-pyi-makespec --hidden-import="pkg_resources.py2_warn" -F -n "Pronterface" --add-data images/\*:images --add-data assets/toolbar/\*.svg:assets/toolbar --add-data assets/icons/pronterface/\*.png:assets/icons/pronterface -w -i "./assets/icons/pronterface.icns" pronterface.py
+pyi-makespec --hidden-import="pkg_resources.py2_warn" -F -n "Pronterface" --add-data "images:images" --add-data "assets:assets" -w -i "./assets_raw/icons/pronterface.icns" pronterface.py
 rm -rf dist
 sed -i '' '$ s/.$//' Pronterface.spec
 cat >> Pronterface.spec <<EOL
@@ -81,7 +81,7 @@ Please see remark for polygon3[^1]
 ### For packaging
 ```
 pip install pyinstaller
-pyi-makespec -F -n "Pronterface" --add-data images/*;images --add-data assets/icons/pronterface/*.png;assets/icons/pronterface --add-data assets/toolbar/*.svg;assets/toolbar -w -i "./assets/icons/pronterface.ico" pronterface.py
+pyi-makespec -F -n "Pronterface" --add-data "images;images" --add-data "assets;assets"-w -i "./assets_raw/icons/pronterface.ico" pronterface.py
 pyinstaller --clean Pronterface.spec -y
 ```
 
