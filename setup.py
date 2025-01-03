@@ -42,7 +42,7 @@ def multiglob(*globs):
 
 def get_data_files():
     data_files = [
-        ('share/pixmaps', multiglob('*.png')),
+        ('share/pixmaps', multiglob('assets_raw/icons/*.png')),
         ('share/applications', multiglob('*.desktop')),
         ('share/metainfo', multiglob('*.appdata.xml')),
         ('share/pronterface/images', multiglob('images/*.png',
