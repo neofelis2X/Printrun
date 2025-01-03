@@ -34,7 +34,7 @@ class ZButtons(FocusCanvas):
     imagename = "control_z.png"
 
     def __init__(self, parent, moveCallback = None, bgcolor = "#FFFFFF", ID=-1):
-        self.bg_bmp = wx.Image(imagefile(self.imagename), wx.BITMAP_TYPE_PNG).ConvertToBitmap()
+        self.bg_bmp = wx.Image(imagefile(self.imagename, "assets/controls"), wx.BITMAP_TYPE_PNG).ConvertToBitmap()
         self.range = None
         self.direction = None
         self.orderOfMagnitudeIdx = 0  # 0 means '1', 1 means '10', 2 means '100', etc.
