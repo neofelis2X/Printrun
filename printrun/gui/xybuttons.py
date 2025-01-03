@@ -75,8 +75,8 @@ class XYButtons(FocusCanvas):
     }
 
     def __init__(self, parent, moveCallback = None, cornerCallback = None, spacebarCallback = None, bgcolor = "#FFFFFF", ID=-1, zcallback=None):
-        self.bg_bmp = wx.Image(imagefile(self.imagename), wx.BITMAP_TYPE_PNG).ConvertToBitmap()
-        self.keypad_bmp = wx.Image(imagefile("arrow_keys.png"), wx.BITMAP_TYPE_PNG).ConvertToBitmap()
+        self.bg_bmp = wx.Image(imagefile(self.imagename, "assets/controls"), wx.BITMAP_TYPE_PNG).ConvertToBitmap()
+        self.keypad_bmp = wx.Image(imagefile("arrow_keys.png", "assets/controls"), wx.BITMAP_TYPE_PNG).ConvertToBitmap()
         self.keypad_idx = -1
         self.hovered_keypad = None
         self.quadrant = None
