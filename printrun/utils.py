@@ -93,29 +93,46 @@ def setup_logging(out, filepath = None, reset_handlers = False):
         logging_handler.setFormatter(formatter)
         logger.addHandler(logging_handler)
 
+def get_scaled_icon(iconname: str, width: int, window: wx.Window) -> wx.Icon:
+    # Scale the icon correctly without making it blurry
+    sc = window.GetContentScaleFactor()
+    final_w = int(width * sc)
+    raw_icn = get_iconbundle(iconname).GetIcon((final_w, final_w),
+                                               wx.IconBundle.FALLBACK_NEAREST_LARGER)
+    ic_bmp = wx.Bitmap()
+    ic_bmp.CopyFromIcon(raw_icn)
+    if raw_icn.GetWidth() != final_w:
+        ic_img = ic_bmp.ConvertToImage()
+        ic_img.Rescale(final_w, final_w, wx.IMAGE_QUALITY_HIGH)
+        ic_bmp = ic_img.ConvertToBitmap()
+    ic_bmp.SetScaleFactor(sc)
+
+    return wx.Icon(ic_bmp)
+
 def get_iconbundle(iconname: str) -> wx.IconBundle:
     icons = wx.IconBundle()
     rel_path = os.path.join("assets", "icons", iconname)
     base_filename = iconname + "_32x32.png"
     png_path = os.path.dirname(imagefile(base_filename, rel_path))
     if not os.path.isdir(png_path):
-        print('Warning: Icon "%s" not found.' % iconname)
+        logging.warning('Icon "%s" not found.' % iconname)
         return icons
     pngs = os.listdir(png_path)
     for file in pngs:
-        if file.endswith(".png") and "@2x" not in file and "x512" not in file:
+        if file.endswith(".png"):
             icons.AddIcon(os.path.join(png_path, file), wx.BITMAP_TYPE_PNG)
 
     return icons
 
-def toolbaricon(iconname: str) -> wx.Bitmap:
+def toolbaricon(iconname: str) -> wx.BitmapBundle:
     icons = wx.BitmapBundle()
     rel_path = os.path.join("assets", "toolbar")
 
     # On windows the application is light grey, even in 'dark mode',
     # therefore on windows we always use the dark icons on bright background.
+    os_name = wx.PlatformInformation().Get().GetOperatingSystemFamilyName()
     if wx.SystemSettings.GetAppearance().IsDark() and \
-        wx.PlatformInformation().Get().GetOperatingSystemFamilyName() != "Windows":
+        os_name != "Windows":
         base_filename = iconname + "_w.svg"
     else:
         base_filename = iconname + ".svg"
@@ -123,8 +140,8 @@ def toolbaricon(iconname: str) -> wx.Bitmap:
     svg_path = imagefile(base_filename, rel_path)
 
     if not os.path.isfile(svg_path):
-        print('Warning: Toolbar icon "%s" not found.' % iconname)
-        return wx.NullBitmap
+        logging.warning('Toolbar icon "%s" not found.' % iconname)
+        return icons
 
     return icons.FromSVGFile(svg_path, (24, 24))
 

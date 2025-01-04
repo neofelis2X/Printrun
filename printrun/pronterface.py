@@ -34,10 +34,10 @@ from . import printcore
 from printrun.spoolmanager import spoolmanager_gui
 
 from .utils import install_locale, setup_logging, dosify, \
-    iconfile, format_time, format_duration, \
+    format_time, format_duration, \
     hexcolor_to_float, parse_temperature_report, \
     prepare_command, compile_file, write_history_to, read_history_from, \
-    get_iconbundle
+    get_iconbundle, get_scaled_icon
 install_locale('pronterface')
 
 try:
@@ -894,7 +894,8 @@ class PronterWindow(MainWindow, pronsole.pronsole):
 
         info = wx.adv.AboutDialogInfo()
 
-        info.SetIcon(get_iconbundle("pronterface").GetIcon((128, 128)))
+        info.SetIcon(get_scaled_icon("pronterface", 128, self))
+
         info.SetName('Printrun')
         info.SetVersion(printcore.__version__)
 
