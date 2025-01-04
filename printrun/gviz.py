@@ -74,7 +74,6 @@ class GvizBaseFrame(wx.Frame):
                              shortHelp = _("Close Window"))
 
     def update_toolbar_icons(self, event):
-        # FIXME: It works for the excluder window but not for the gviz.
         self.toolbar.SetToolNormalBitmap(1, toolbaricon('zoom_out'))
         self.toolbar.SetToolNormalBitmap(2, toolbaricon('zoom_in'))
         self.toolbar.SetToolNormalBitmap(3, toolbaricon('reset'))
