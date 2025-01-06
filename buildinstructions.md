@@ -81,7 +81,7 @@ Please see remark for polygon3[^1]
 ### For packaging
 ```
 pip install pyinstaller
-pyi-makespec -F -n "Pronterface" --add-data "printrun/assets;printrun/assets"-w -i "./assets_raw/icons/pronterface.ico" pronterface.py
+pyi-makespec -F -n "Pronterface" --add-data "printrun/assets;printrun/assets" -w -i "./assets_raw/icons/pronterface.ico" pronterface.py
 pyinstaller --clean Pronterface.spec -y
 ```
 
