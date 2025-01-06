@@ -176,10 +176,10 @@ echo ****************************************
 echo ****** Collect all data for build ******
 echo ****************************************
 
-pyi-makespec -F --name "Pronterface" --add-data "images;images" --add-data "assets;assets" -w -i "./assets_raw/icons/pronterface.ico" pronterface.py
+pyi-makespec -F --name "Pronterface" --add-data "printrun/assets;printrun/assets" -w -i "./assets_raw/icons/pronterface.ico" pronterface.py
 pyi-makespec -F --name "Pronsole" -c -i "./assets_raw/icons/pronsole.ico" pronsole.py
 rem Plater stand alone application is experimental only (See remark).
-pyi-makespec -F --name "Plater" --add-data "assets/icons/plater/*.png;assets/icons/plater" -w -i "./assets_raw/icons/g_plater.ico" plater.py
+pyi-makespec -F --name "Plater" --add-data "printrun/assets/icons/plater/*.png;printrun/assets/icons/plater" -w -i "./assets_raw/icons/plater.ico" plater.py
 
 echo ***************************************************************
 echo ****** Build Pronterface, Pronsole and Plater executables *****

@@ -111,7 +111,7 @@ def get_scaled_icon(iconname: str, width: int, window: wx.Window) -> wx.Icon:
 
 def get_iconbundle(iconname: str) -> wx.IconBundle:
     icons = wx.IconBundle()
-    rel_path = os.path.join("assets", "icons", iconname)
+    rel_path = os.path.join("printrun", "assets", "icons", iconname)
     base_filename = iconname + "_32x32.png"
     png_path = os.path.dirname(imagefile(base_filename, rel_path))
     if not os.path.isdir(png_path):
@@ -126,7 +126,7 @@ def get_iconbundle(iconname: str) -> wx.IconBundle:
 
 def toolbaricon(iconname: str) -> wx.BitmapBundle:
     icons = wx.BitmapBundle()
-    rel_path = os.path.join("assets", "toolbar")
+    rel_path = os.path.join("printrun", "assets", "toolbar")
 
     # On windows the application is light grey, even in 'dark mode',
     # therefore on windows we always use the dark icons on bright background.

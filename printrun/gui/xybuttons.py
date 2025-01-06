@@ -66,7 +66,8 @@ class XYButtons(FocusCanvas):
     concentric_inset = 11
     center = (124, 121)
     spacer = 7
-    imagename = os.path.split(imagefile("control_xy.png", "assets/controls"))
+    imagedir = "printrun/assets/controls"
+    imagename = "control_xy.png"
     corner_to_axis = {
         -1: "center",
         0: "x",
@@ -76,8 +77,9 @@ class XYButtons(FocusCanvas):
     }
 
     def __init__(self, parent, moveCallback = None, cornerCallback = None, spacebarCallback = None, bgcolor = "#FFFFFF", ID=-1, zcallback=None):
-        self.bg_bmp = wx.BitmapBundle().FromFiles(self.imagename[0], self.imagename[1][:-4], extension="png")
-        self.keypad_bmp = wx.BitmapBundle().FromSVGFile(imagefile("arrow_keys.svg", "assets/controls"), (33, 23))
+        imagename = os.path.split(imagefile(self.imagename, self.imagedir))
+        self.bg_bmp = wx.BitmapBundle().FromFiles(imagename[0], imagename[1][:-4], extension="png")
+        self.keypad_bmp = wx.BitmapBundle().FromSVGFile(imagefile("arrow_keys.svg", self.imagedir), (33, 23))
         self.keypad_idx = -1
         self.hovered_keypad = None
         self.quadrant = None
@@ -449,7 +451,7 @@ class XYButtons(FocusCanvas):
         self.update()
 
 class XYButtonsMini(XYButtons):
-    imagename = os.path.split(imagefile("control_mini.png", "assets/controls"))
+    imagename = "control_mini.png"
     center = (57, 56.5)
     concentric_circle_radii = [0, 30.3]
     corner_inset = (5, 5)

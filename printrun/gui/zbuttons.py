@@ -32,10 +32,12 @@ class ZButtons(FocusCanvas):
         1: (1.1, 41.5, 10.6),
         2: (1.1, 68, 13),
     }
-    imagename = os.path.split(imagefile("control_z.png", "assets/controls"))
+    imagedir = "printrun/assets/controls"
+    imagename = "control_z.png"
 
     def __init__(self, parent, moveCallback = None, bgcolor = "#FFFFFF", ID=-1):
-        self.bg_bmp = wx.BitmapBundle().FromFiles(self.imagename[0], self.imagename[1][:-4], extension="png")
+        imagename = os.path.split(imagefile(self.imagename, self.imagedir))
+        self.bg_bmp = wx.BitmapBundle().FromFiles(imagename[0], imagename[1][:-4], extension="png")
         self.range = None
         self.direction = None
         self.orderOfMagnitudeIdx = 0  # 0 means '1', 1 means '10', 2 means '100', etc.
@@ -176,5 +178,5 @@ class ZButtonsMini(ZButtons):
         0: (1, 18, 9),
         1: (1, 42.8, 12.9),
     }
-    imagename = os.path.split(imagefile("control_z_mini.png", "assets/controls"))
+    imagename = "control_z_mini.png"
     move_values = [0.1, 10]

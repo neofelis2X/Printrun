@@ -39,3 +39,6 @@ dynamic = [  # these variables are dynamically set at `setup.py`
 Homepage = "https://github.com/kliment/Printrun/"
 Issues = "https://github.com/kliment/Printrun/issues"
 Changelog = "https://github.com/kliment/Printrun/blob/master/NEWS.md"
+
+[tool.setuptools]
+include-package-data = false
