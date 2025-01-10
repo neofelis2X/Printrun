@@ -27,9 +27,9 @@ class ExcluderWindow(gviz.GvizWindow):
         self.parent = excluder
 
         tool_pos = self.toolbar.GetToolPos(6)
-        self.toolbar.InsertTool(tool_pos, 8, _('Reset Selection'),
-                                toolbaricon('reset'),
-                                shortHelp = _("Reset Selection"))
+        self.toolbar.InsertTool(tool_pos, 8, _("Clear Selection"),
+                                toolbaricon("clear"),
+                                shortHelp = _("Clear Selection"))
         self.toolbar.DeleteTool(6)
         self.toolbar.DeleteTool(7)
         self.toolbar.Realize()
