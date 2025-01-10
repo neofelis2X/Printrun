@@ -81,7 +81,7 @@ class GvizBaseFrame(wx.Frame):
         self.toolbar.SetToolNormalBitmap(5, toolbaricon('layer_up'))
         self.toolbar.SetToolNormalBitmap(6, toolbaricon('inject'))
         self.toolbar.SetToolNormalBitmap(7, toolbaricon('edit'))
-        self.toolbar.SetToolNormalBitmap(8, toolbaricon('reset'))
+        self.toolbar.SetToolNormalBitmap(8, toolbaricon('clear'))
         self.toolbar.SetToolNormalBitmap(9, toolbaricon('exit'))
         self.toolbar.SetToolNormalBitmap(10, toolbaricon('fit'))
 
