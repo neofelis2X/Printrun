@@ -24,6 +24,7 @@ import shlex
 import locale
 import logging
 from pathlib import Path
+from typing import Union
 
 import wx
 import wx.svg
@@ -94,11 +95,14 @@ def setup_logging(out, filepath = None, reset_handlers = False):
         logger.addHandler(logging_handler)
 
 def get_scaled_icon(iconname: str, width: int, window: wx.Window) -> wx.Icon:
-    # Scale the icon correctly without making it blurry
+    """
+    Find the specified icon and scale it correctly without making it blurry.
+    """
     sc = window.GetContentScaleFactor()
     final_w = int(width * sc)
     raw_icn = get_iconbundle(iconname).GetIcon((final_w, final_w),
                                                wx.IconBundle.FALLBACK_NEAREST_LARGER)
+
     ic_bmp = wx.Bitmap()
     ic_bmp.CopyFromIcon(raw_icn)
     if raw_icn.GetWidth() != final_w:
@@ -110,23 +114,35 @@ def get_scaled_icon(iconname: str, width: int, window: wx.Window) -> wx.Icon:
     return wx.Icon(ic_bmp)
 
 def get_iconbundle(iconname: str) -> wx.IconBundle:
+    """
+    Get a IconBundle of an application-icon with the specified name.
+    If the icon cannot be found, an empty IconBundle is returned.
+    """
+
     icons = wx.IconBundle()
-    rel_path = os.path.join("printrun", "assets", "icons", iconname)
+    rel_path = Path("printrun", "assets", "icons", iconname)
+
     base_filename = iconname + "_32x32.png"
-    png_path = os.path.dirname(imagefile(base_filename, rel_path))
-    if not os.path.isdir(png_path):
-        logging.warning('Icon "%s" not found.' % iconname)
+    png_file = imagefile(base_filename, rel_path)
+
+    if not png_file.is_file():
         return icons
-    pngs = os.listdir(png_path)
+
+    pngs = png_file.parent.iterdir()
     for file in pngs:
-        if file.endswith(".png"):
-            icons.AddIcon(os.path.join(png_path, file), wx.BITMAP_TYPE_PNG)
+        if file.suffix == ".png":
+            icons.AddIcon(str(file), wx.BITMAP_TYPE_PNG)
 
     return icons
 
 def toolbaricon(iconname: str) -> wx.BitmapBundle:
+    """
+    Get a BitmapBundle of a toolbar-icon with the specified name.
+    If the icon cannot be found, an empty BitmapBundle is returned.
+    """
+
     icons = wx.BitmapBundle()
-    rel_path = os.path.join("printrun", "assets", "toolbar")
+    rel_path = Path("printrun", "assets", "toolbar")
 
     # On windows the application is light grey, even in 'dark mode',
     # therefore on windows we always use the dark icons on bright background.
@@ -139,34 +155,42 @@ def toolbaricon(iconname: str) -> wx.BitmapBundle:
 
     svg_path = imagefile(base_filename, rel_path)
 
-    if not os.path.isfile(svg_path):
-        logging.warning('Toolbar icon "%s" not found.' % iconname)
+    if not svg_path.is_file():
         return icons
 
-    return icons.FromSVGFile(svg_path, (24, 24))
+    return icons.FromSVGFile(str(svg_path), (24, 24))
 
-def iconfile(filename):
-    '''
-    Get the full path to filename by checking in standard icon locations
-    ("pixmaps" directories) or use the frozen executable if applicable
-    (See the lookup_file function's documentation for behavior).
-    '''
-    if hasattr(sys, "frozen") and sys.frozen == "windows_exe":
-        return sys.executable
-    return pixmapfile(filename)
-
-def imagefile(filename, img_directory="images"):
-    '''
+def imagefile(filename: str, directory: Path=Path()) -> Path:
+    """
     Get the full path to filename by checking standard image locations,
     those being possible locations of the pronterface "images" directory
     (See the lookup_file function's documentation for behavior).
-    '''
 
-    return lookup_file(filename, [img_directory, "pronterface/" + img_directory])
+    Parameters
+    ----------
+    filename : str
+        Name of file to look for (without any path).
+    directory : pathlib.Path
+        A relative path to potential folder containing `filename`.
+
+    Returns
+    -------
+    A string containing the full path if found, or the name of the file if not
+    found.
+    """
+
+    possible_img = lookup_file(filename, [directory, "pronterface" / directory])
+
+    if isinstance(possible_img, str) or not possible_img.exists():
+        logging.warning('Imagefile "%s" not found.' % filename)
+        return Path()
+
+    return possible_img
 
 
-def lookup_file(filename, folders=None, locations=None):
-    """Look for a file in different locations.
+def lookup_file(filename: str, folders=None, locations=None) -> Union[Path, str]:
+    """
+    Look for a file in different locations.
 
     Get the full path to `filename` by checking in one or several combinations
     of folders and locations, or in the frozen data (for bundled packages) if
@@ -187,9 +211,8 @@ def lookup_file(filename, folders=None, locations=None):
 
     Returns
     -------
-    A string containing the full path if found, or the name of the file if not
+    A pathlib.Path of the full path if found, or the name of the file if not
     found.
-
     """
 
     script_location = Path(sys.argv[0]).resolve().parent
@@ -212,17 +235,8 @@ def lookup_file(filename, folders=None, locations=None):
         for folder in _folders:
             candidate = location / folder / filename
             if candidate.exists():
-                return str(candidate)
+                return candidate
     return filename
-
-
-def pixmapfile(filename):
-    '''
-    Get the full path to filename by checking in standard icon
-    ("pixmaps") directories (See the lookup_file function's
-    documentation for behavior).
-    '''
-    return lookup_file(filename, ["pixmaps"])
 
 
 def decode_utf8(s):
