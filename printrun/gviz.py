@@ -31,6 +31,8 @@ class GvizBaseFrame(wx.Frame):
     def create_base_ui(self):
         self.CreateStatusBar(1)
         self.SetStatusText(_("Layer number and Z position show here when you scroll"))
+
+        parent = wx.GetTopLevelParent(self)
         self.SetIcons(get_iconbundle("pronterface"))
 
         panel = wx.Panel(self, -1)

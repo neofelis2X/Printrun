@@ -17,7 +17,7 @@
 
 import wx
 from printrun.gui.widgets import get_space
-from printrun.utils import install_locale, get_iconbundle
+from printrun.utils import install_locale
 install_locale('pronterface')
 # Set up Internationalization using gettext
 
@@ -37,7 +37,7 @@ class SpoolManagerMainWindow(wx.Frame):
         # An empty wx.Frame has a darker background on win, but filled with a panel it looks native
         self.panel = wx.Panel(self, -1)
 
-        self.SetIcons(get_iconbundle("pronterface"))
+        self.SetIcons(parent.GetIcons())
 
         # Initiate the back-end
         self.spool_manager = spool_manager

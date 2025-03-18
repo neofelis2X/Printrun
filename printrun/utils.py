@@ -94,14 +94,19 @@ def setup_logging(out, filepath = None, reset_handlers = False):
         logging_handler.setFormatter(formatter)
         logger.addHandler(logging_handler)
 
-def get_scaled_icon(iconname: str, width: int, window: wx.Window) -> wx.Icon:
+def get_scaled_icon(iconname: str, width: int, window: wx.Window,
+                    iconbundle = None) -> wx.Icon:
     """
     Find the specified icon and scale it correctly without making it blurry.
     """
     sc = window.GetContentScaleFactor()
     final_w = int(width * sc)
-    raw_icn = get_iconbundle(iconname).GetIcon((final_w, final_w),
-                                               wx.IconBundle.FALLBACK_NEAREST_LARGER)
+
+    if not iconbundle:
+        iconbundle =  get_iconbundle(iconname)
+
+    raw_icn = iconbundle.GetIcon((final_w, final_w),
+                                 wx.IconBundle.FALLBACK_NEAREST_LARGER)
 
     ic_bmp = wx.Bitmap()
     ic_bmp.CopyFromIcon(raw_icn)
@@ -160,7 +165,7 @@ def toolbaricon(iconname: str) -> wx.BitmapBundle:
 
     return icons.FromSVGFile(str(svg_path), (24, 24))
 
-def imagefile(filename: str, directory: Path=Path()) -> Path:
+def imagefile(filename: str, directory: Path = Path()) -> Path:
     """
     Get the full path to filename by checking standard image locations,
     those being possible locations of the pronterface "images" directory

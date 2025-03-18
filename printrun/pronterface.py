@@ -589,7 +589,8 @@ class PronterWindow(MainWindow, pronsole.pronsole):
                          build_dimensions = self.build_dimensions_list,
                          circular_platform = self.settings.circular_bed,
                          simarrange_path = self.settings.simarrange_path,
-                         antialias_samples = int(self.settings.antialias3dsamples)).Show()
+                         antialias_samples = int(self.settings.antialias3dsamples),
+                         iconbundle = self.GetIcons()).Show()
 
     def plate_gcode(self, e):
         from . import gcodeplater as plater
@@ -598,7 +599,8 @@ class PronterWindow(MainWindow, pronsole.pronsole):
                            parent = self,
                            build_dimensions = self.build_dimensions_list,
                            circular_platform = self.settings.circular_bed,
-                           antialias_samples = int(self.settings.antialias3dsamples)).Show()
+                           antialias_samples = int(self.settings.antialias3dsamples),
+                           iconbundle = self.GetIcons()).Show()
 
     def platecb(self, name):
         self.log(_("Plated %s") % name)
@@ -894,7 +896,8 @@ class PronterWindow(MainWindow, pronsole.pronsole):
 
         info = wx.adv.AboutDialogInfo()
 
-        info.SetIcon(get_scaled_icon("pronterface", 128, self))
+        icon = get_scaled_icon("pronterface", 128, self, iconbundle=self.GetIcons())
+        info.SetIcon(icon)
 
         info.SetName('Printrun')
         info.SetVersion(printcore.__version__)
@@ -2409,6 +2412,7 @@ Printrun. If not, see <http://www.gnu.org/licenses/>."""
 
     def new_macro(self, e = None):
         dialog = wx.Dialog(self, -1, _("Enter macro name"))
+        dialog.SetIcons(self.GetIcons())
         panel = wx.Panel(dialog)
         textsizer = wx.BoxSizer(wx.HORIZONTAL)
         text = wx.StaticText(panel, -1, _("Macro name:"))
