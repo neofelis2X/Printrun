@@ -13,15 +13,18 @@
 # You should have received a copy of the GNU General Public License
 # along with Printrun.  If not, see <http://www.gnu.org/licenses/>.
 
-import os.path
+from pathlib import Path
+
 import wx
 from printrun.gui.xybuttons import FocusCanvas
 from printrun.utils import imagefile
 
 def sign(n):
-    if n < 0: return -1
-    elif n > 0: return 1
-    else: return 0
+    if n < 0:
+        return -1
+    if n > 0:
+        return 1
+    return 0
 
 class ZButtons(FocusCanvas):
     button_ydistances = [7, 30, 55, 83]  # ,112
@@ -32,12 +35,12 @@ class ZButtons(FocusCanvas):
         1: (1.1, 41.5, 10.6),
         2: (1.1, 68, 13),
     }
-    imagedir = "printrun/assets/controls"
+    imagedir = Path("printrun", "assets", "controls")
     imagename = "control_z.png"
 
     def __init__(self, parent, moveCallback = None, bgcolor = "#FFFFFF", ID=-1):
-        imagename = os.path.split(imagefile(self.imagename, self.imagedir))
-        self.bg_bmp = wx.BitmapBundle().FromFiles(imagename[0], imagename[1][:-4], extension="png")
+        imagepath = imagefile(self.imagename, self.imagedir)
+        self.bg_bmp = wx.BitmapBundle().FromFiles(str(imagepath.parent), str(imagepath.stem), extension="png")
         self.range = None
         self.direction = None
         self.orderOfMagnitudeIdx = 0  # 0 means '1', 1 means '10', 2 means '100', etc.

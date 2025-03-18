@@ -13,16 +13,19 @@
 # You should have received a copy of the GNU General Public License
 # along with Printrun.  If not, see <http://www.gnu.org/licenses/>.
 
-import os.path
-import wx
+from pathlib import Path
 import math
+
+import wx
 from .bufferedcanvas import BufferedCanvas
 from printrun.utils import imagefile
 
 def sign(n):
-    if n < 0: return -1
-    elif n > 0: return 1
-    else: return 0
+    if n < 0:
+        return -1
+    if n > 0:
+        return 1
+    return 0
 
 DASHES = [4, 7]
 # Brush and pen for grey overlay when mouse hovers over
@@ -33,7 +36,7 @@ class FocusCanvas(BufferedCanvas):
     def __init__(self, *args, **kwds):
         super().__init__(*args, **kwds)
         self.Bind(wx.EVT_SET_FOCUS, self.onFocus)
-    
+
     def onFocus(self, evt):
         self.Refresh()
         evt.Skip()
@@ -66,7 +69,7 @@ class XYButtons(FocusCanvas):
     concentric_inset = 11
     center = (124, 121)
     spacer = 7
-    imagedir = "printrun/assets/controls"
+    imagedir = Path("printrun", "assets", "controls")
     imagename = "control_xy.png"
     corner_to_axis = {
         -1: "center",
@@ -77,9 +80,9 @@ class XYButtons(FocusCanvas):
     }
 
     def __init__(self, parent, moveCallback = None, cornerCallback = None, spacebarCallback = None, bgcolor = "#FFFFFF", ID=-1, zcallback=None):
-        imagename = os.path.split(imagefile(self.imagename, self.imagedir))
-        self.bg_bmp = wx.BitmapBundle().FromFiles(imagename[0], imagename[1][:-4], extension="png")
-        self.keypad_bmp = wx.BitmapBundle().FromSVGFile(imagefile("arrow_keys.svg", self.imagedir), (33, 23))
+        imagepath = imagefile(self.imagename, self.imagedir)
+        self.bg_bmp = wx.BitmapBundle().FromFiles(str(imagepath.parent), str(imagepath.stem), extension="png")
+        self.keypad_bmp = wx.BitmapBundle().FromSVGFile(str(imagefile("arrow_keys.svg", self.imagedir)), (33, 23))
         self.keypad_idx = -1
         self.hovered_keypad = None
         self.quadrant = None
