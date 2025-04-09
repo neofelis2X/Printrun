@@ -31,15 +31,15 @@ from pyglet.gl import GLint, GLdouble, glEnable,glBlendFunc,glViewport, \
     GL_LEQUAL, GL_ONE_MINUS_SRC_ALPHA,GL_DEPTH_BUFFER_BIT, \
     GL_SRC_ALPHA, GL_BLEND, GL_COLOR_BUFFER_BIT, GL_CULL_FACE, \
     GL_VIEWPORT, GL_FRONT_AND_BACK,GL_DEPTH_TEST, GL_FILL
-
-# those are legacy calls which need to be replaced
-from pyglet.gl import GL_LIGHTING, GL_LIGHT0, GL_LIGHT1, GL_POSITION, \
-    GL_DIFFUSE, GL_AMBIENT, GL_SPECULAR, GL_COLOR_MATERIAL, GL_SMOOTH, \
-    GL_NORMALIZE, GL_PROJECTION_MATRIX, GL_AMBIENT_AND_DIFFUSE, \
-    GL_SHININESS, GL_EMISSION, GL_MODELVIEW, \
-    glMaterialf, glColorMaterial, glMaterialfv, glLightfv, glShadeModel, \
-    glPushMatrix, glPopMatrix, glMultMatrixd, glMatrixMode
-
+#
+# # those are legacy calls which need to be replaced
+# from pyglet.gl import GL_LIGHTING, GL_LIGHT0, GL_LIGHT1, GL_POSITION, \
+#     GL_DIFFUSE, GL_AMBIENT, GL_SPECULAR, GL_COLOR_MATERIAL, GL_SMOOTH, \
+#     GL_NORMALIZE, GL_PROJECTION_MATRIX, GL_AMBIENT_AND_DIFFUSE, \
+#     GL_SHININESS, GL_EMISSION, GL_MODELVIEW, \
+#     glMaterialf, glColorMaterial, glMaterialfv, glLightfv, glShadeModel, \
+#     glPushMatrix, glPopMatrix, glMultMatrixd, glMatrixMode
+#
 from pyglet import gl
 
 from .mathutils import vec, np_unproject, np_to_gl_mat, \
@@ -127,12 +127,10 @@ class wxGLPanel(BASE_CLASS):
             self.init_frametime()
 
         ctx_attrs = glcanvas.GLContextAttrs()
-        # FIXME: Pronterface supports only OpenGL 2.1 and compability mode at the moment
-        # ctx_attrs.PlatformDefaults().CoreProfile().MajorVersion(3).MinorVersion(3).EndList()
-        ctx_attrs.PlatformDefaults().EndList()
+        ctx_attrs.PlatformDefaults().CoreProfile().MajorVersion(3).MinorVersion(3).EndList()
         self.context = glcanvas.GLContext(self.canvas, ctxAttrs = ctx_attrs)
         # initialised with pyglet during glinit
-        self.pygletcontext: Optional[gl.Context] = None
+        self.pygletcontext = None
 
         self.mousepos = (0, 0)
         self.parent = parent
@@ -249,8 +247,8 @@ class wxGLPanel(BASE_CLASS):
         self.pygletcontext.set_current()
         glinfo = self.pygletcontext.get_info()
         logging.debug("OpenGL Context Version: %s, Vendor: %s - %s" %
-                     (glinfo.get_version(), glinfo.get_vendor(),
-                      glinfo.get_renderer()))
+                      (glinfo.get_version(), glinfo.get_vendor(),
+                       glinfo.get_renderer()))
 
         # normal gl init
         glClearColor(*self.color_background)
@@ -262,8 +260,8 @@ class wxGLPanel(BASE_CLASS):
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
-        self._setup_lights()
-        self._setup_material()
+        #self._setup_lights()
+        #self._setup_material()
 
         if call_reshape:
             self.OnReshape()
@@ -283,7 +281,6 @@ class wxGLPanel(BASE_CLASS):
         self.focus.update_size()
         self.OnInitGL(call_reshape = False)
         glViewport(0, 0, width, height)
-        self.camera.create_projection_matrix()
 
         self.width = max(float(width), 1.0)
         self.height = max(float(height), 1.0)
@@ -307,45 +304,45 @@ class wxGLPanel(BASE_CLASS):
                 factor = 1.0
 
             self.camera.zoom(factor)
-
-    def _setup_lights(self) -> None:
-        '''Sets the lightscene for gcode and stl models'''
-        glEnable(GL_LIGHTING)
-
-        glEnable(GL_LIGHT0)
-        glLightfv(GL_LIGHT0, GL_AMBIENT, vec(0.0, 0.0, 0.0, 1.0))
-        glLightfv(GL_LIGHT0, GL_SPECULAR, vec(0.6, 0.6, 0.6, 1.0))
-        glLightfv(GL_LIGHT0, GL_DIFFUSE, vec(0.7, 0.7, 0.7, 1.0))
-        glLightfv(GL_LIGHT0, GL_POSITION, vec(0.9, 2.8, 1.7, 0.0))
-
-        glEnable(GL_LIGHT1)
-        glLightfv(GL_LIGHT1, GL_AMBIENT, vec(0.0, 0.0, 0.0, 1.0))
-        glLightfv(GL_LIGHT1, GL_SPECULAR, vec(0.6, 0.6, 0.6, 1.0))
-        glLightfv(GL_LIGHT1, GL_DIFFUSE, vec(0.7, 0.7, 0.7, 1.0))
-        glLightfv(GL_LIGHT1, GL_POSITION, vec(-1.2, -1.0, 2.2, 0.0))
-
-        glEnable(GL_NORMALIZE)
-        glShadeModel(GL_SMOOTH)
-
-    def _setup_material(self) -> None:
-        '''Sets the material attributes for all objects'''
-
-        # Switch this two lines to show models as wireframe
-        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
-        # glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
-
-        # Material specs are set here once and only the
-        # the material colour is changed later
-        glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE, vec(0.5, 0.1, 0.3, 1.0))
-        glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, vec(0.35, 0.35, 0.35, 1.0))
-        glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, 80.0)
-        glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION, vec(0.0, 0.0, 0.0, 1.0))
-
-        # This enables tracking of the material colour,
-        # now it can be changed only by calling glColor
-        glEnable(GL_COLOR_MATERIAL)
-        glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE)
-
+    #
+    # def _setup_lights(self) -> None:
+    #     '''Sets the lightscene for gcode and stl models'''
+    #     glEnable(GL_LIGHTING)
+    #
+    #     glEnable(GL_LIGHT0)
+    #     glLightfv(GL_LIGHT0, GL_AMBIENT, vec(0.0, 0.0, 0.0, 1.0))
+    #     glLightfv(GL_LIGHT0, GL_SPECULAR, vec(0.6, 0.6, 0.6, 1.0))
+    #     glLightfv(GL_LIGHT0, GL_DIFFUSE, vec(0.7, 0.7, 0.7, 1.0))
+    #     glLightfv(GL_LIGHT0, GL_POSITION, vec(0.9, 2.8, 1.7, 0.0))
+    #
+    #     glEnable(GL_LIGHT1)
+    #     glLightfv(GL_LIGHT1, GL_AMBIENT, vec(0.0, 0.0, 0.0, 1.0))
+    #     glLightfv(GL_LIGHT1, GL_SPECULAR, vec(0.6, 0.6, 0.6, 1.0))
+    #     glLightfv(GL_LIGHT1, GL_DIFFUSE, vec(0.7, 0.7, 0.7, 1.0))
+    #     glLightfv(GL_LIGHT1, GL_POSITION, vec(-1.2, -1.0, 2.2, 0.0))
+    #
+    #     glEnable(GL_NORMALIZE)
+    #     glShadeModel(GL_SMOOTH)
+    #
+    # def _setup_material(self) -> None:
+    #     '''Sets the material attributes for all objects'''
+    #
+    #     # Switch this two lines to show models as wireframe
+    #     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
+    #     # glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
+    #
+    #     # Material specs are set here once and only the
+    #     # the material colour is changed later
+    #     glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE, vec(0.5, 0.1, 0.3, 1.0))
+    #     glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, vec(0.35, 0.35, 0.35, 1.0))
+    #     glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, 80.0)
+    #     glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION, vec(0.0, 0.0, 0.0, 1.0))
+    #
+    #     # This enables tracking of the material colour,
+    #     # now it can be changed only by calling glColor
+    #     glEnable(GL_COLOR_MATERIAL)
+    #     glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE)
+    #
     def resetview(self) -> None:
         self.set_current_context()
         self.camera.reset_view_matrix()
@@ -372,11 +369,12 @@ class wxGLPanel(BASE_CLASS):
         glClearColor(*self.color_background)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
-        self.platform.draw()
-        self.draw_objects()
+        #self.platform.draw()
+        #self.draw_objects()
 
         if self.canvas.HasFocus():
-            self.focus.draw()
+            #self.focus.draw()
+            pass
 
         self.canvas.SwapBuffers()
 
@@ -388,12 +386,9 @@ class wxGLPanel(BASE_CLASS):
                            draw_function: Callable[[], None]) -> None:
         '''Apply transformations to the model and then
         draw it with the given draw function'''
-        glMatrixMode(GL_MODELVIEW)
-        glPushMatrix()
-        self._load_model_matrix(model)
+        modelmat = self._load_model_matrix(model)
         # Draw the models
         draw_function()
-        glPopMatrix()
 
     def _load_model_matrix(self, model: Union['GCObject', stltool.stl]) -> None:
         tm = mat4_translation(*model.offsets)
@@ -402,7 +397,7 @@ class wxGLPanel(BASE_CLASS):
         sm = mat4_scaling(*model.scale)
         mat = sm @ tc @ rm @ tm
 
-        glMultMatrixd(np_to_gl_mat(mat))
+        return np_to_gl_mat(mat)
 
     # ==========================================================================
     # To be implemented by a sub class
@@ -423,14 +418,13 @@ class wxGLPanel(BASE_CLASS):
         x = float(x)
         y = self.height - float(y)
 
-        pmat = (GLdouble * 16)()
-        mvmat = self.camera.get_view_matrix()
+        mvmat = self.camera.view
+        pmat = self.camera.projection
         viewport = (GLint * 4)()
         px = (GLdouble)()
         py = (GLdouble)()
         pz = (GLdouble)()
         glGetIntegerv(GL_VIEWPORT, viewport)
-        glGetDoublev(GL_PROJECTION_MATRIX, pmat)
 
         np_unproject(x, y, z, mvmat, pmat, viewport, px, py, pz)
 
@@ -441,16 +435,14 @@ class wxGLPanel(BASE_CLASS):
         # Ray from z-depth 1.0 to 0.0
         x = float(x)
         y = self.height - float(y)
-        pmat = (GLdouble * 16)()
-        mvmat = (GLdouble * 16)()
+        mvmat = self.camera.view
+        pmat = self.camera.projection
         viewport = (GLint * 4)()
         px = (GLdouble)()
         py = (GLdouble)()
         pz = (GLdouble)()
         # FIXME: This can be replaced with self.width, self.height
         glGetIntegerv(GL_VIEWPORT, viewport)
-        glGetDoublev(GL_PROJECTION_MATRIX, pmat)
-        mvmat = self.camera.get_view_matrix()
         np_unproject(x, y, 1.0, mvmat, pmat, viewport, px, py, pz)
         ray_far = (px.value, py.value, pz.value)
         np_unproject(x, y, 0.0, mvmat, pmat, viewport, px, py, pz)
