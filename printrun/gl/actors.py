@@ -33,8 +33,9 @@ from pyglet.gl import GLfloat, GLuint, \
                       GL_ARRAY_BUFFER, GL_STATIC_DRAW,\
                       GL_CULL_FACE, GL_LINE_SMOOTH, GL_LINE_WIDTH
 
+
 # those are legacy calls which need to be replaced
-from pyglet.gl import glPushMatrix, glPopMatrix, glMultMatrixd, \
+from pyglet.gl.gl_compat import glPushMatrix, glPopMatrix, glMultMatrixd, \
                         glColor4f, glVertex3f, glBegin, glEnd, \
                         glVertexPointer, glColorPointer, glEnableClientState, \
                         glDisableClientState, glNormalPointer, glColor3f, \
@@ -44,7 +45,7 @@ from pyglet.gl import glPushMatrix, glPopMatrix, glMultMatrixd, \
 
 from .mathutils import mat4_translation, mat4_rotation, np_to_gl_mat
 
-from pyglet.graphics.vertexbuffer import VertexBufferObject as BufferObject
+from pyglet.graphics.vertexbuffer import BufferObject
 from pyglet.graphics import Batch
 
 from . import camera
@@ -62,8 +63,8 @@ Build_Dims = Tuple[int, int, int, int, int, int]
 def numpy2vbo(nparray: np.ndarray, target = GL_ARRAY_BUFFER,
               usage = GL_STATIC_DRAW) -> BufferObject:
 
-    vbo = BufferObject(nparray.nbytes, usage=usage, target=target)
-    vbo.bind()
+    vbo = BufferObject(nparray.nbytes, usage=usage)
+    vbo.bind(target=target)
     vbo.set_data(nparray.ctypes.data)
     return vbo
 
@@ -444,8 +445,7 @@ class Focus:
             self.color = (*self.COLOR_LIGHT, 0.4)  # Light Transparent
 
     def draw(self) -> None:
-        self.camera.create_pseudo2d_matrix()
-
+        # load ortho2d matrix
         glDisable(GL_LIGHTING)
         # Draw a stippled line around the vertices
         glLineStipple(1, 0xff00)
@@ -459,8 +459,6 @@ class Focus:
 
         glDisable(GL_LINE_STIPPLE)
         glEnable(GL_LIGHTING)
-
-        self.camera.revert_pseudo2d_matrix()
 
 
 class CuttingPlane:
@@ -585,6 +583,7 @@ class MeshModel:
                 vertices.extend(coords)
                 normals.extend(facet[0])
 
+        """
         self.vl = self.batch.add(len(vertices) // 3,
                                 GL_TRIANGLES,
                                 None,  # group
@@ -593,6 +592,7 @@ class MeshModel:
                                 ('c3f/static', self.color[:-1] * (len(vertices) // 3)))
 
         model.batch = self.batch  # type: ignore
+        """
 
     def delete(self) -> None:
         if self.vl:

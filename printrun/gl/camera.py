@@ -16,14 +16,9 @@
 from threading import Lock
 
 import numpy as np
+from pyglet.math import Mat4
 
-# those are legacy calls which need to be replaced
-from pyglet.gl import GL_PROJECTION, GL_MODELVIEW, \
-                      glLoadMatrixd, glMatrixMode, \
-                      glPushMatrix, glPopMatrix, \
-                      glOrtho, gluPerspective
-
-from .mathutils import vec_length, trackball, np_to_gl_mat, \
+from .mathutils import vec_length, trackball, pyg_to_gl_mat4, np_to_gl_mat, \
                        mulquat, axis_to_quat, quat_rotate_vec
 
 # for type hints
@@ -66,13 +61,28 @@ class Camera():
 
         self.init_rot_pos = None
         self.init_trans_pos = None
-        self.view_mat = self.CTYPE_IDENTITY
-        self.proj_mat = np.identity(4)
+        self._view_mat = self.CTYPE_IDENTITY
+        self._proj_mat = self.CTYPE_IDENTITY
+        self._ortho2d_mat = self.CTYPE_IDENTITY
+
+    @property
+    def view(self):
+        return self._view_mat
+
+    @property
+    def projection(self):
+        return self._proj_mat
+
+    @property
+    def projection2d(self):
+        return self._ortho2d_mat
 
     def update_size(self, width: int, height: int, scalefactor: float) -> None:
         self.width = width
         self.height = height
         self.display_ppi_factor = scalefactor
+        self._rebuild_proj_mat()
+        self._rebuild_ortho2d_mat()
 
     def update_build_dims(self, build_dimensions: Build_Dims,
                           setview: bool = True) -> None:
@@ -100,8 +110,6 @@ class Camera():
         self._rebuild_view_mat()
 
     def reset_view_matrix(self) -> None:
-        glMatrixMode(GL_MODELVIEW)
-        glLoadMatrixd(self.CTYPE_IDENTITY)
         self.up = np.array((0.0, 1.0, 0.0))
         self.x_axis = np.array((-1.0, 0.0, 0.0))
         self._set_initial_view()
@@ -116,51 +124,32 @@ class Camera():
         # conversion between millimeter and pixel
         dolly_constant = 1.05 * self.display_ppi_factor
         self.dolly_factor = dolly_length / min_side * dolly_constant
-        self.create_projection_matrix()
+        self._rebuild_proj_mat()
 
         self._rebuild_view_mat()
         self.view_matrix_initialized = True
 
-    def create_projection_matrix(self) -> None:
-        glMatrixMode(GL_PROJECTION)
-        glLoadMatrixd(self.CTYPE_IDENTITY)
-
+    def _rebuild_proj_mat(self) -> None:
         if self.is_orthographic:
-            glOrtho(-self.width / 2 * self.dolly_factor,
-                    self.width / 2 * self.dolly_factor,
-                    -self.height / 2 * self.dolly_factor,
-                    self.height / 2 * self.dolly_factor,
-                    0.01, 3 * self.dist)
+            ddf = 2 * self.dolly_factor
+            mat = Mat4.orthogonal_projection(-self.width / ddf,
+                                             self.width / ddf,
+                                             -self.height / ddf,
+                                             self.height / ddf,
+                                             0.01, 3 * self.dist)
+            self._proj_mat = pyg_to_gl_mat4(mat)
         else:
-            gluPerspective(self.FOV, self.width / self.height,
-                           0.1, 5.5 * self.dist)
+            mat = Mat4.perspective_projection(self.width / self.height,
+                                              0.1, 5.5 * self.dist, self.FOV)
+            self._proj_mat = pyg_to_gl_mat4(mat)
 
-    def create_pseudo2d_matrix(self) -> None:
-        '''Create untransformed matrices to render
-        coordinates directly on the canvas, quasi 2D.
-        Use always in conjunction with revert'''
+    def _rebuild_ortho2d_mat(self) -> None:
+        '''Create orthogonal matrix to render
+        coordinates directly on the canvas, quasi 2D.'''
 
-        glMatrixMode(GL_MODELVIEW)
-        glPushMatrix()  # backup and clear MODELVIEW
-        glLoadMatrixd(self.CTYPE_IDENTITY)
-
-        glMatrixMode(GL_PROJECTION)
-        glPushMatrix()  # backup and clear PROJECTION
-        glLoadMatrixd(self.CTYPE_IDENTITY)
-
-        glOrtho(0.0, self.width, 0.0, self.height, -1.0, 1.0)
-
-    def revert_pseudo2d_matrix(self) -> None:
-        '''Revert current matrices back to the normal, saved matrices'''
-
-        glMatrixMode(GL_PROJECTION)
-        glPopMatrix()  # restore PROJECTION
-
-        glMatrixMode(GL_MODELVIEW)
-        glPopMatrix()  # restore MODELVIEW
-
-    def get_view_matrix(self) -> Array:
-        return self.view_mat
+        mat = Mat4.orthogonal_projection(0.0, self.width, 0.0,
+                                         self.height, -1.0, 1.0)
+        self._ortho2d_mat = pyg_to_gl_mat4(mat)
 
     def move_rel(self, x: float, y: float, z: float) -> None:
         """
@@ -220,7 +209,7 @@ class Camera():
                 return
 
             self.dolly_factor = df
-            self.create_projection_matrix()
+            self._rebuild_proj_mat()
 
             if to_cursor:
                 cursor_vec = np.array(self.canvas.mouse_to_3d(to_cursor[0],
@@ -358,10 +347,7 @@ class Camera():
         return dolly_dist / dolly_limits
 
     def _rebuild_view_mat(self) -> None:
-        self.view_mat = self._look_at(self.eye , self.target, self.up)
-
-        glMatrixMode(GL_MODELVIEW)
-        glLoadMatrixd(self.view_mat)
+        self._view_mat = self._look_at(self.eye , self.target, self.up)
 
     def _look_at(self, eye: np.ndarray,
                        center: np.ndarray,
