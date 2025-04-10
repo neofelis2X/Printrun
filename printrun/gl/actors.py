@@ -30,8 +30,11 @@ from pyglet.gl import GLfloat, GLuint, \
                       glDrawArrays, glDrawRangeElements, \
                       GL_VERTEX_ARRAY, GL_ELEMENT_ARRAY_BUFFER, \
                       GL_UNSIGNED_INT, GL_FLOAT, GL_TRIANGLES, GL_LINES, \
-                      GL_ARRAY_BUFFER, GL_STATIC_DRAW,\
-                      GL_CULL_FACE, GL_LINE_SMOOTH, GL_LINE_WIDTH
+                      GL_ARRAY_BUFFER, GL_STATIC_DRAW, GL_FALSE, \
+                      GL_CULL_FACE, GL_LINE_SMOOTH, GL_LINE_WIDTH, \
+                      glGenVertexArrays, glBindVertexArray, glGenBuffers, \
+                      glBindBuffer, glBufferData, glEnableVertexAttribArray, \
+                      glVertexAttribPointer, GL_UNSIGNED_INT, glDrawElements
 
 
 # those are legacy calls which need to be replaced
@@ -49,6 +52,7 @@ from pyglet.graphics.vertexbuffer import BufferObject
 from pyglet.graphics import Batch
 
 from . import camera
+from . import renderer
 
 from printrun.utils import install_locale
 install_locale("pronterface")
@@ -422,19 +426,32 @@ class Focus:
         self.vertices = ()
         self.indices = ()
         self.color = (15 / 255, 15 / 255, 15 / 255, 0.6)  # Black Transparent
-        self._initialise_data()
+        self.vao = GLuint(0)
+        self.vbo = GLuint(0)
+        self.ebo = GLuint(0)
+        self.is_initialised = False
 
-    def _initialise_data(self) -> None:
+    def initialise(self) -> None:
+        self.vao, self.vbo, self.ebo = renderer.create_buffers()
+
+        self.is_initialised = True
+        self.update_size()
+        self.indices = (0, 1, 1, 2, 2, 3, 3, 0)
+        renderer.fill_buffer(self.ebo, self.indices, GL_ELEMENT_ARRAY_BUFFER)
+
+    def update_size(self) -> None:
+        if not self.is_initialised:
+            return
+
         # Starts at the lower left corner, x, y
-        offset = 2.0 * self.camera.display_ppi_factor
+        offset = 4.0 * self.camera.display_ppi_factor
         self.vertices = ((offset, offset, 0.0),
                          (self.camera.width - offset, offset, 0.0),
                          (self.camera.width - offset, self.camera.height - offset, 0.0),
                          (offset, self.camera.height - offset, 0.0))
-        self.indices = (0, 1, 1, 2, 2, 3, 3, 0)
 
-    def update_size(self) -> None:
-        self._initialise_data()
+        vs = renderer.interleave_vertex_data(self.vertices, self.color)
+        renderer.fill_buffer(self.vbo, vs, GL_ARRAY_BUFFER)
 
     def update_colour(self, bg_color: Tuple[float, float, float]) -> None:
         '''Update the color of the focus based on the
@@ -443,22 +460,25 @@ class Focus:
             self.color = (*self.COLOR_DARK, 0.6)  # Dark Transparent
         else:
             self.color = (*self.COLOR_LIGHT, 0.4)  # Light Transparent
+        self.update_size()
 
     def draw(self) -> None:
+        glBindVertexArray(self.vao)
+        glDrawElements(GL_LINES, len(self.indices), GL_UNSIGNED_INT, 0)
         # load ortho2d matrix
-        glDisable(GL_LIGHTING)
-        # Draw a stippled line around the vertices
-        glLineStipple(1, 0xff00)
-        glColor4f(*self.color)
-        glEnable(GL_LINE_STIPPLE)
-
-        glBegin(GL_LINES)
-        for index in self.indices:
-            glVertex3f(*self.vertices[index])
-        glEnd()
-
-        glDisable(GL_LINE_STIPPLE)
-        glEnable(GL_LIGHTING)
+        # glDisable(GL_LIGHTING)
+        # # Draw a stippled line around the vertices
+        # glLineStipple(1, 0xff00)
+        # glColor4f(*self.color)
+        # glEnable(GL_LINE_STIPPLE)
+        #
+        # glBegin(GL_LINES)
+        # for index in self.indices:
+        #     glVertex3f(*self.vertices[index])
+        # glEnd()
+        #
+        # glDisable(GL_LINE_STIPPLE)
+        # glEnable(GL_LIGHTING)
 
 
 class CuttingPlane:

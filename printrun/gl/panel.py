@@ -16,6 +16,7 @@
 import logging
 import time
 import traceback
+import ctypes
 
 import wx
 from wx import glcanvas
@@ -27,10 +28,11 @@ pyglet.options['shadow_window'] = False
 
 from pyglet.gl import GLint, GLdouble, glEnable,glBlendFunc,glViewport, \
     glClear, glClearColor, glClearDepth, glDepthFunc, glGetDoublev, \
-    glGetIntegerv, glPolygonMode, \
+    glGetIntegerv, glPolygonMode, glGetUniformLocation, glUniformMatrix4fv, \
     GL_LEQUAL, GL_ONE_MINUS_SRC_ALPHA,GL_DEPTH_BUFFER_BIT, \
     GL_SRC_ALPHA, GL_BLEND, GL_COLOR_BUFFER_BIT, GL_CULL_FACE, \
-    GL_VIEWPORT, GL_FRONT_AND_BACK,GL_DEPTH_TEST, GL_FILL
+    GL_VIEWPORT, GL_FRONT_AND_BACK,GL_DEPTH_TEST, GL_FILL, GL_FALSE
+
 #
 # # those are legacy calls which need to be replaced
 # from pyglet.gl import GL_LIGHTING, GL_LIGHT0, GL_LIGHT1, GL_POSITION, \
@@ -44,6 +46,7 @@ from pyglet import gl
 
 from .mathutils import vec, np_unproject, np_to_gl_mat, \
                        mat4_translation, mat4_rotation, mat4_scaling
+from . import renderer
 from . import actors
 from . import camera
 from . import keyboardinput as kbi
@@ -117,6 +120,7 @@ class wxGLPanel(BASE_CLASS):
         self.width = 1.0
         self.height = 1.0
 
+        self.shader = {}
         self.camera = camera.Camera(self, build_dimensions, ortho = not perspective)
         self.focus = actors.Focus(self.camera)
         self.platform = actors.Platform(build_dimensions, circular = circular, grid = grid)
@@ -260,6 +264,9 @@ class wxGLPanel(BASE_CLASS):
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
+        sh = renderer.load_shader()
+        self.shader["basic"] = sh
+        self.focus.initialise()
         #self._setup_lights()
         #self._setup_material()
 
@@ -277,13 +284,14 @@ class wxGLPanel(BASE_CLASS):
         if width < 1 or height < 1:
             return
 
-        self.camera.update_size(width, height, self.GetContentScaleFactor())
-        self.focus.update_size()
         self.OnInitGL(call_reshape = False)
         glViewport(0, 0, width, height)
 
         self.width = max(float(width), 1.0)
         self.height = max(float(height), 1.0)
+
+        self.camera.update_size(width, height, self.GetContentScaleFactor())
+        self.focus.update_size()
 
         if not self.camera.view_matrix_initialized:
             self.camera.reset_view_matrix()
@@ -368,13 +376,17 @@ class wxGLPanel(BASE_CLASS):
 
         glClearColor(*self.color_background)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+        self.shader["basic"].use()
 
         #self.platform.draw()
         #self.draw_objects()
 
         if self.canvas.HasFocus():
-            #self.focus.draw()
-            pass
+            mat = self.camera.projection2d
+            uloc = glGetUniformLocation(self.shader["basic"].id, b"modelViewProjection")
+            matptr = ctypes.pointer(mat)
+            glUniformMatrix4fv(uloc, 1, GL_FALSE, matptr[0])
+            self.focus.draw()
 
         self.canvas.SwapBuffers()
 
