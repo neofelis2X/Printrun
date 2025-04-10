@@ -420,6 +420,7 @@ class Focus:
 
     COLOR_LIGHT = (205 / 255, 205 / 255, 205 / 255)
     COLOR_DARK = (15 / 255, 15 / 255, 15 / 255)
+    is_3d = False
 
     def __init__(self, cam: camera.Camera) -> None:
         self.camera = cam

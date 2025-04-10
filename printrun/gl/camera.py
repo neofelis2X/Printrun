@@ -18,13 +18,12 @@ from threading import Lock
 import numpy as np
 from pyglet.math import Mat4
 
-from .mathutils import vec_length, trackball, pyg_to_gl_mat4, np_to_gl_mat, \
+from .mathutils import vec_length, trackball, pyg_to_np_mat4, np_to_gl_mat, \
                        mulquat, axis_to_quat, quat_rotate_vec
 
 # for type hints
 from typing import Optional, Tuple, TYPE_CHECKING
 from wx import MouseEvent
-from ctypes import Array
 Build_Dims = Tuple[int, int, int, int, int, int]
 if TYPE_CHECKING:
     from .panel import wxGLPanel
@@ -33,7 +32,8 @@ if TYPE_CHECKING:
 class Camera():
 
     LOCK = Lock()
-    CTYPE_IDENTITY = np_to_gl_mat(np.identity(4))
+    CTYPE_IDENTITY = np_to_gl_mat(np.identity(4, dtype=np.float32))
+    NP_IDENTITY = np.identity(4, dtype=np.float32)
     FOV = 45.0
 
     def __init__(self, parent: 'wxGLPanel', build_dimensions: Build_Dims,
@@ -61,20 +61,20 @@ class Camera():
 
         self.init_rot_pos = None
         self.init_trans_pos = None
-        self._view_mat = self.CTYPE_IDENTITY
-        self._proj_mat = self.CTYPE_IDENTITY
-        self._ortho2d_mat = self.CTYPE_IDENTITY
+        self._view_mat = self.NP_IDENTITY
+        self._proj_mat = self.NP_IDENTITY
+        self._ortho2d_mat = self.NP_IDENTITY
 
     @property
-    def view(self):
+    def view(self) -> np.ndarray:
         return self._view_mat
 
     @property
-    def projection(self):
+    def projection(self) -> np.ndarray:
         return self._proj_mat
 
     @property
-    def projection2d(self):
+    def projection2d(self) -> np.ndarray:
         return self._ortho2d_mat
 
     def update_size(self, width: int, height: int, scalefactor: float) -> None:
@@ -137,11 +137,11 @@ class Camera():
                                              -self.height / ddf,
                                              self.height / ddf,
                                              0.01, 3 * self.dist)
-            self._proj_mat = pyg_to_gl_mat4(mat)
+            self._proj_mat = pyg_to_np_mat4(mat)
         else:
             mat = Mat4.perspective_projection(self.width / self.height,
                                               0.1, 5.5 * self.dist, self.FOV)
-            self._proj_mat = pyg_to_gl_mat4(mat)
+            self._proj_mat = pyg_to_np_mat4(mat)
 
     def _rebuild_ortho2d_mat(self) -> None:
         '''Create orthogonal matrix to render
@@ -149,7 +149,7 @@ class Camera():
 
         mat = Mat4.orthogonal_projection(0.0, self.width, 0.0,
                                          self.height, -1.0, 1.0)
-        self._ortho2d_mat = pyg_to_gl_mat4(mat)
+        self._ortho2d_mat = pyg_to_np_mat4(mat)
 
     def move_rel(self, x: float, y: float, z: float) -> None:
         """
@@ -351,7 +351,7 @@ class Camera():
 
     def _look_at(self, eye: np.ndarray,
                        center: np.ndarray,
-                       up: np.ndarray) -> Array:
+                       up: np.ndarray) -> np.ndarray:
         """
         Classic gluLookAt implementation that takes in numpy arrays for
         the vector eye, center (target) and global up and returns a 4x4
@@ -368,7 +368,7 @@ class Camera():
         # Recalculate the up vector (y-axis in camera space)
         true_up = np.cross(right, forward)
 
-        view_matrix = np.identity(4)
+        view_matrix = self.NP_IDENTITY
 
         # Negate z-vector to look at the viewer
         forward = -forward
@@ -383,5 +383,5 @@ class Camera():
         view_matrix[1, 3] = -np.dot(true_up, eye)
         view_matrix[2, 3] = -np.dot(forward, eye)
 
-        return np_to_gl_mat(view_matrix.T)
+        return view_matrix.T
 

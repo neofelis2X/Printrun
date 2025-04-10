@@ -65,7 +65,7 @@ def axis_to_quat(a: np.ndarray,
     return tuple(q)
 
 def build_rotmatrix(q: Tuple[float, float, float, float]) -> np.ndarray:
-    m = np.zeros((16, 1)) # (GLdouble * 16)()
+    m = np.zeros((16, 1), dtype=np.float32) # (GLdouble * 16)()
     m[0] = 1.0 - 2.0 * (q[1] * q[1] + q[2] * q[2])
     m[1] = 2.0 * (q[0] * q[1] - q[2] * q[3])
     m[2] = 2.0 * (q[2] * q[0] + q[1] * q[3])
@@ -139,7 +139,7 @@ def mat4_translation(x_val: float, y_val: float,
     Returns a 4x4 translation matrix
     """
 
-    matrix = np.identity(4)
+    matrix = np.identity(4, dtype=np.float32)
     matrix[3][0] = x_val
     matrix[3][1] = y_val
     matrix[3][2] = z_val
@@ -152,7 +152,7 @@ def mat4_rotation(x: float, y: float,
     Returns a 4x4 rotation matrix, enter rotation angle in degree
     """
 
-    matrix = np.identity(4)
+    matrix = np.identity(4, dtype=np.float32)
     co = np.cos(np.radians(angle_deg))
     si = np.sin(np.radians(angle_deg))
     matrix[0][0] = x * x * (1 - co) + co
@@ -172,23 +172,21 @@ def mat4_scaling(x_val: float, y_val: float, z_val: float) -> np.ndarray:
     Returns a 4x4 scaling matrix
     """
 
-    matrix = np.identity(4)
+    matrix = np.identity(4, dtype=np.float32)
     matrix[0][0] = x_val
     matrix[1][1] = y_val
     matrix[2][2] = z_val
 
     return matrix
 
-def pyg_to_gl_mat4(pyg_matrix) -> Array:
+def pyg_to_np_mat4(pyg_matrix) -> np.ndarray:
     """
-    Converts a pyglet Mat4() matrix into a c_types_Array which
-    can be directly passed into OpenGL calls.
+    Converts a pyglet Mat4() matrix into a numpy array.
     """
-    array_type = c_float * 16
-    return array_type(*pyg_matrix.column(0),
-                      *pyg_matrix.column(1),
-                      *pyg_matrix.column(2),
-                      *pyg_matrix.column(3))
+    return np.array((*pyg_matrix.column(0),
+                     *pyg_matrix.column(1),
+                     *pyg_matrix.column(2),
+                     *pyg_matrix.column(3)), dtype=np.float32)
 
 def np_to_gl_mat(np_matrix: np.ndarray) -> Array:
     """
