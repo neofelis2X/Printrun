@@ -14,8 +14,8 @@
 # along with Printrun.  If not, see <http://www.gnu.org/licenses/>.
 
 from pathlib import Path
+import ctypes
 from pyglet.graphics import shader
-from ctypes import sizeof
 
 from pyglet.gl import GLfloat, GLuint, \
                       glEnable, glDisable, glGetFloatv, glLineWidth, \
@@ -26,7 +26,9 @@ from pyglet.gl import GLfloat, GLuint, \
                       GL_CULL_FACE, GL_LINE_SMOOTH, GL_LINE_WIDTH, \
                       glGenVertexArrays, glBindVertexArray, glGenBuffers, \
                       glBindBuffer, glBufferData, glEnableVertexAttribArray, \
-                      glVertexAttribPointer, GL_UNSIGNED_INT, glDrawElements
+                      glVertexAttribPointer, GL_UNSIGNED_INT, glDrawElements, \
+                      glGetUniformLocation, glUniformMatrix4fv
+
 
 def load_shader():
     vert_source = Path("printrun/assets/shader/basic.vert.glsl")
@@ -41,6 +43,17 @@ def load_shader():
     frag_shader.delete()
 
     return shader_program
+
+def load_mvp_uniform(shader_id, camera, actor):
+    if actor.is_3d:
+        modelmatrix = actor.modelmatrix
+        mat = camera.projection @ camera.view @ modelmatrix
+    else:
+        mat = camera.projection2d
+
+    location = glGetUniformLocation(shader_id, b"modelViewProjection")
+    ptr = mat.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+    glUniformMatrix4fv(location, 1, GL_FALSE, ptr)
 
 def interleave_vertex_data(verts, color):
     data = []
@@ -68,9 +81,10 @@ def create_buffers():
     glBindBuffer(GL_ARRAY_BUFFER, vbo)
 
     glEnableVertexAttribArray(0)  # Vertex position
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 7 * sizeof(GLfloat), 0)
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 7 * ctypes.sizeof(GLfloat), 0)
     glEnableVertexAttribArray(1)  # Vertex colour
-    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 7 * sizeof(GLfloat), 3 * sizeof(GLfloat))
+    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 7 * ctypes.sizeof(GLfloat),
+                          3 * ctypes.sizeof(GLfloat))
 
     # Index buffer object
     glGenBuffers(1, ebo)
@@ -81,7 +95,7 @@ def create_buffers():
 def fill_buffer(buffer, data, kind) -> None:
     gl_array = get_gl_array(data)
     glBindBuffer(kind, buffer)
-    glBufferData(kind, sizeof(gl_array), gl_array, GL_STATIC_DRAW)
+    glBufferData(kind, ctypes.sizeof(gl_array), gl_array, GL_STATIC_DRAW)
 
 def get_gl_array(pylist):
     if isinstance(pylist[0], int):
