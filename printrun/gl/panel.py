@@ -382,10 +382,7 @@ class wxGLPanel(BASE_CLASS):
         #self.draw_objects()
 
         if self.canvas.HasFocus():
-            mat = self.camera.projection2d
-            uloc = glGetUniformLocation(self.shader["basic"].id, b"modelViewProjection")
-            matptr = ctypes.pointer(mat)
-            glUniformMatrix4fv(uloc, 1, GL_FALSE, matptr[0])
+            renderer.load_mvp_uniform(self.shader["basic"].id, self.camera, self.focus)
             self.focus.draw()
 
         self.canvas.SwapBuffers()
@@ -402,7 +399,7 @@ class wxGLPanel(BASE_CLASS):
         # Draw the models
         draw_function()
 
-    def _load_model_matrix(self, model: Union['GCObject', stltool.stl]) -> None:
+    def _load_model_matrix(self, model: Union['GCObject', stltool.stl]):
         tm = mat4_translation(*model.offsets)
         rm = mat4_rotation(0.0, 0.0, 1.0, model.rot)
         tc = mat4_translation(*model.centeroffset)
