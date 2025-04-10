@@ -20,7 +20,7 @@ from pyglet import gl
 
 # for type hints
 from typing import List, Tuple
-from ctypes import Array, c_int, c_double
+from ctypes import Array, c_int, c_double, c_float
 
 def vec(*args: float) -> Array:
     '''Returns an array of GLfloat values'''
@@ -184,7 +184,7 @@ def pyg_to_gl_mat4(pyg_matrix) -> Array:
     Converts a pyglet Mat4() matrix into a c_types_Array which
     can be directly passed into OpenGL calls.
     """
-    array_type = c_double * 16
+    array_type = c_float * 16
     return array_type(*pyg_matrix.column(0),
                       *pyg_matrix.column(1),
                       *pyg_matrix.column(2),
