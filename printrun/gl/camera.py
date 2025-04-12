@@ -16,9 +16,8 @@
 from threading import Lock
 
 import numpy as np
-from pyglet.math import Mat4
 
-from .mathutils import vec_length, trackball, pyg_to_np_mat4, np_to_gl_mat, \
+from .mathutils import vec_length, trackball, mat4_orthographic, mat4_perspective, \
                        mulquat, axis_to_quat, quat_rotate_vec
 
 # for type hints
@@ -32,8 +31,6 @@ if TYPE_CHECKING:
 class Camera():
 
     LOCK = Lock()
-    CTYPE_IDENTITY = np_to_gl_mat(np.identity(4, dtype=np.float32))
-    NP_IDENTITY = np.identity(4, dtype=np.float32)
     FOV = 45.0
 
     def __init__(self, parent: 'wxGLPanel', build_dimensions: Build_Dims,
@@ -61,9 +58,9 @@ class Camera():
 
         self.init_rot_pos = None
         self.init_trans_pos = None
-        self._view_mat = self.NP_IDENTITY
-        self._proj_mat = self.NP_IDENTITY
-        self._ortho2d_mat = self.NP_IDENTITY
+        self._view_mat = np.identity(4, dtype=np.float32)
+        self._proj_mat = np.identity(4, dtype=np.float32)
+        self._ortho2d_mat = np.identity(4, dtype=np.float32)
 
     @property
     def view(self) -> np.ndarray:
@@ -131,25 +128,23 @@ class Camera():
 
     def _rebuild_proj_mat(self) -> None:
         if self.is_orthographic:
-            ddf = 2 * self.dolly_factor
-            mat = Mat4.orthogonal_projection(-self.width / ddf,
-                                             self.width / ddf,
-                                             -self.height / ddf,
-                                             self.height / ddf,
-                                             0.01, 3 * self.dist)
-            self._proj_mat = pyg_to_np_mat4(mat)
+            # FIXME: Something regarding the ortho "zoom" does not behave as expected.
+            ddf = 50.0 * self.dolly_factor  # 50.0 used to be 2.0 ??
+            self._proj_mat = mat4_orthographic(-self.width / ddf,
+                                               self.width / ddf,
+                                               -self.height / ddf,
+                                               self.height / ddf,
+                                               0.01, 3 * self.dist)
         else:
-            mat = Mat4.perspective_projection(self.width / self.height,
-                                              0.1, 5.5 * self.dist, self.FOV)
-            self._proj_mat = pyg_to_np_mat4(mat)
+            self._proj_mat = mat4_perspective(self.FOV, self.width / self.height,
+                                              0.1, 5.5 * self.dist)
 
     def _rebuild_ortho2d_mat(self) -> None:
         '''Create orthogonal matrix to render
         coordinates directly on the canvas, quasi 2D.'''
 
-        mat = Mat4.orthogonal_projection(0.0, self.width, 0.0,
-                                         self.height, -1.0, 1.0)
-        self._ortho2d_mat = pyg_to_np_mat4(mat)
+        self._ortho2d_mat = mat4_orthographic(0.0, self.width, 0.0,
+                                              self.height, -1.0, 1.0)
 
     def move_rel(self, x: float, y: float, z: float) -> None:
         """
@@ -368,7 +363,7 @@ class Camera():
         # Recalculate the up vector (y-axis in camera space)
         true_up = np.cross(right, forward)
 
-        view_matrix = self.NP_IDENTITY
+        view_matrix = np.identity(4, dtype=np.float32)
 
         # Negate z-vector to look at the viewer
         forward = -forward
@@ -383,5 +378,5 @@ class Camera():
         view_matrix[1, 3] = -np.dot(true_up, eye)
         view_matrix[2, 3] = -np.dot(forward, eye)
 
-        return view_matrix.T
+        return view_matrix
 

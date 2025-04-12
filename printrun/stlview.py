@@ -26,6 +26,7 @@ import numpy as np
 from . import stltool
 from .gl.panel import wxGLPanel
 from .gl import actors
+from .gl import renderer
 
 from .utils import install_locale
 install_locale("pronterface")
@@ -72,6 +73,8 @@ class StlViewPanel(wxGLPanel):
     def OnInitGL(self, *args, call_reshape: bool = True, **kwargs) -> None:
         '''Initialize OpenGL for use in the window.'''
         super().OnInitGL(call_reshape, *args, **kwargs)
+
+        self.gl_cursor.load()
 
         if hasattr(self.parent, "filenames") and self.parent.filenames:
             for filename in self.parent.filenames:
@@ -135,27 +138,28 @@ class StlViewPanel(wxGLPanel):
 
         if intersection is not None:
             self.gl_cursor.position = intersection
+            renderer.load_mvp_uniform(self.shader["basic"].id, self.camera, self.gl_cursor)
             self.gl_cursor.draw()
-
-        # Draw objects
-        for i in self.parent.models:
-            model = self.parent.models[i]
-            # Apply transformations and draw the models
-            self.transform_and_draw(model, model.batch.draw)
-
-        # Draw cutting plane
-        if self.parent.cutting:
-            axis = self.parent.cutting_axis
-            fixed_dist = self.parent.cutting_dist
-            dist = self.get_cutting_dist(axis, fixed_dist)
-
-            if dist is not None:
-                direction = self.parent.cutting_direction
-                # TODO: Check if plane has even changed (use buttonEvent?)
-                self.cutting_plane.update_plane(axis, direction)
-                self.cutting_plane.update_position(dist)
-                self.cutting_plane.draw()
-
+        #
+        # # Draw objects
+        # for i in self.parent.models:
+        #     model = self.parent.models[i]
+        #     # Apply transformations and draw the models
+        #     self.transform_and_draw(model, model.batch.draw)
+        #
+        # # Draw cutting plane
+        # if self.parent.cutting:
+        #     axis = self.parent.cutting_axis
+        #     fixed_dist = self.parent.cutting_dist
+        #     dist = self.get_cutting_dist(axis, fixed_dist)
+        #
+        #     if dist is not None:
+        #         direction = self.parent.cutting_direction
+        #         # TODO: Check if plane has even changed (use buttonEvent?)
+        #         self.cutting_plane.update_plane(axis, direction)
+        #         self.cutting_plane.update_position(dist)
+        #         self.cutting_plane.draw()
+        #
     # ==========================================================================
     # Utils
     # ==========================================================================

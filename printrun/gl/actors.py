@@ -344,10 +344,26 @@ class MouseCursor:
         self.vertices: List[Tuple[float, float, float]] = []
         self.indices: List[int] = []
         self.color = (225 / 255, 0 / 255, 45 / 255, 1.0)  # Red
+        self.is_3d = True
+        self.vao = GLuint(0)
+        self.vbo = GLuint(0)
+        self.ebo = GLuint(0)
+        self._modelmatrix = np.identity(4, dtype=np.float32)
         self._initialise_data()
+
+    @property
+    def modelmatrix(self):
+        self._modelmatrix = mat4_translation(*self.position)
+        return self._modelmatrix
 
     def update_position(self, position_3d: Tuple[float, float, float]) -> None:
         self.position = position_3d
+
+    def load(self):
+        self.vao, self.vbo, self.ebo = renderer.create_buffers()
+        vb = renderer.interleave_vertex_data(self.vertices, self.color)
+        renderer.fill_buffer(self.vbo, vb, GL_ARRAY_BUFFER)
+        renderer.fill_buffer(self.ebo, self.indices, GL_ELEMENT_ARRAY_BUFFER)
 
     def _initialise_data(self) -> None:
         self.vertices, self.indices = self._circle()
@@ -390,27 +406,12 @@ class MouseCursor:
 
         return (vertices, indices)
 
-    def _get_transformation(self) -> Array:
-        mat = mat4_translation(*self.position)
-        return np_to_gl_mat(mat)
-
     def draw(self) -> None:
-        glPushMatrix()
-
-        glMultMatrixd(self._get_transformation())
-
+        #glNormal3f(0.0, 0.0, 1.0)
         glDisable(GL_CULL_FACE)
-
-        glColor4f(*self.color)
-        glNormal3f(0.0, 0.0, 1.0)
-
-        glBegin(GL_TRIANGLES)
-        for index in self.indices:
-            glVertex3f(*self.vertices[index])
-        glEnd()
-
+        glBindVertexArray(self.vao)
+        glDrawElements(GL_TRIANGLES, len(self.indices), GL_UNSIGNED_INT, 0)
         glEnable(GL_CULL_FACE)
-        glPopMatrix()
 
 
 class Focus:
@@ -432,7 +433,7 @@ class Focus:
         self.ebo = GLuint(0)
         self.is_initialised = False
 
-    def initialise(self) -> None:
+    def load(self) -> None:
         self.vao, self.vbo, self.ebo = renderer.create_buffers()
 
         self.is_initialised = True
@@ -464,22 +465,12 @@ class Focus:
         self.update_size()
 
     def draw(self) -> None:
-        glBindVertexArray(self.vao)
-        glDrawElements(GL_LINES, len(self.indices), GL_UNSIGNED_INT, 0)
-        # load ortho2d matrix
         # glDisable(GL_LIGHTING)
         # # Draw a stippled line around the vertices
         # glLineStipple(1, 0xff00)
-        # glColor4f(*self.color)
         # glEnable(GL_LINE_STIPPLE)
-        #
-        # glBegin(GL_LINES)
-        # for index in self.indices:
-        #     glVertex3f(*self.vertices[index])
-        # glEnd()
-        #
-        # glDisable(GL_LINE_STIPPLE)
-        # glEnable(GL_LIGHTING)
+        glBindVertexArray(self.vao)
+        glDrawElements(GL_LINES, len(self.indices), GL_UNSIGNED_INT, 0)
 
 
 class CuttingPlane:
