@@ -22,6 +22,7 @@ import math
 import logging
 import threading
 import numpy as np
+from abc import ABC, abstractmethod
 
 from ctypes import sizeof
 
@@ -123,7 +124,28 @@ class BoundingBox:
         return round(height, 2)
 
 
-class Platform:
+class ActorBaseClass(ABC):
+    """
+    Cursor where the mouse should be in 3D space.
+    """
+    is_3d = True
+
+    def __init__(self) -> None:
+        self.vao = GLuint(0)
+        self.vbo = GLuint(0)
+        self.ebo = GLuint(0)
+        self._modelmatrix = np.identity(4, dtype=np.float32)
+
+    @property
+    def modelmatrix(self):
+        return self._modelmatrix
+
+    @abstractmethod
+    def draw(self):
+        ...
+
+
+class Platform(ActorBaseClass):
     """
     Platform grid on which models are placed.
     """
@@ -135,6 +157,7 @@ class Platform:
                  light: bool = False,
                  circular: bool = False,
                  grid: Tuple[int, int] = (1, 10)) -> None:
+        super().__init__()
         self.light = light
         self.is_circular = circular
         self.width = build_dimensions[0]
@@ -335,20 +358,16 @@ class Platform:
         glEnable(GL_LIGHTING)
 
 
-class MouseCursor:
+class MouseCursor(ActorBaseClass):
     """
     Cursor where the mouse should be in 3D space.
     """
     def __init__(self) -> None:
+        super().__init__()
         self.position = (0.0, 0.0, 0.0)
         self.vertices: List[Tuple[float, float, float]] = []
         self.indices: List[int] = []
         self.color = (225 / 255, 0 / 255, 45 / 255, 1.0)  # Red
-        self.is_3d = True
-        self.vao = GLuint(0)
-        self.vbo = GLuint(0)
-        self.ebo = GLuint(0)
-        self._modelmatrix = np.identity(4, dtype=np.float32)
         self._initialise_data()
 
     @property
@@ -414,7 +433,7 @@ class MouseCursor:
         glEnable(GL_CULL_FACE)
 
 
-class Focus:
+class Focus(ActorBaseClass):
     """
     Outline around the currently active OpenGL panel.
     """
@@ -424,13 +443,11 @@ class Focus:
     is_3d = False
 
     def __init__(self, cam: camera.Camera) -> None:
+        super().__init__()
         self.camera = cam
         self.vertices = ()
         self.indices = ()
         self.color = (15 / 255, 15 / 255, 15 / 255, 0.6)  # Black Transparent
-        self.vao = GLuint(0)
-        self.vbo = GLuint(0)
-        self.ebo = GLuint(0)
         self.is_initialised = False
 
     def load(self) -> None:
@@ -473,12 +490,13 @@ class Focus:
         glDrawElements(GL_LINES, len(self.indices), GL_UNSIGNED_INT, 0)
 
 
-class CuttingPlane:
+class CuttingPlane(ActorBaseClass):
     """
     A plane that indicates the axis and position
     on which the stl model will be cut.
     """
     def __init__(self, build_dimensions: Build_Dims) -> None:
+        super().__init__()
         self.width = build_dimensions[0]
         self.depth = build_dimensions[1]
         self.height = build_dimensions[2]
@@ -572,12 +590,13 @@ class CuttingPlane:
 # to be adjustable by the user.
 
 
-class MeshModel:
+class MeshModel(ActorBaseClass):
     """
     Model geometries based on triangulated
     meshes such as .stl, .obj, .3mf etc.
     """
     def __init__(self, model: stltool.stl) -> None:
+        super().__init__()
         self.color = (77 / 255, 178 / 255, 128 / 255, 1.0)  # Greenish
         # Every model is placed into it's own batch.
         # This is not ideal, but good enough for the moment.
