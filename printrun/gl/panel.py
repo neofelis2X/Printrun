@@ -210,7 +210,8 @@ class wxGLPanel(BASE_CLASS):
 
         if not self.gl_broken:
             try:
-                self.OnInitGL()
+                if not self.GLinitialized:
+                    self.OnInitGL()
                 self.DrawCanvas()
             except pyglet.gl.GLException:
                 self.gl_broken = True
@@ -266,7 +267,7 @@ class wxGLPanel(BASE_CLASS):
 
         sh = renderer.load_shader()
         self.shader["basic"] = sh
-        self.focus.initialise()
+        self.focus.load()
         #self._setup_lights()
         #self._setup_material()
 
@@ -379,7 +380,7 @@ class wxGLPanel(BASE_CLASS):
         self.shader["basic"].use()
 
         #self.platform.draw()
-        #self.draw_objects()
+        self.draw_objects()
 
         if self.canvas.HasFocus():
             renderer.load_mvp_uniform(self.shader["basic"].id, self.camera, self.focus)
@@ -429,15 +430,10 @@ class wxGLPanel(BASE_CLASS):
 
         mvmat = self.camera.view
         pmat = self.camera.projection
-        viewport = (GLint * 4)()
-        px = (GLdouble)()
-        py = (GLdouble)()
-        pz = (GLdouble)()
-        glGetIntegerv(GL_VIEWPORT, viewport)
+        viewport = (0.0, 0.0, self.width, self.height)
 
-        np_unproject(x, y, z, mvmat, pmat, viewport, px, py, pz)
-
-        return px.value, py.value, pz.value
+        px, py, pz = np_unproject(x, y, z, mvmat, pmat, viewport)
+        return px, py, pz
 
     def mouse_to_ray(self, x: float, y: float,
                      ) -> Tuple[Tuple[float, float, float], Tuple[float, float, float]]:
@@ -446,16 +442,10 @@ class wxGLPanel(BASE_CLASS):
         y = self.height - float(y)
         mvmat = self.camera.view
         pmat = self.camera.projection
-        viewport = (GLint * 4)()
-        px = (GLdouble)()
-        py = (GLdouble)()
-        pz = (GLdouble)()
-        # FIXME: This can be replaced with self.width, self.height
-        glGetIntegerv(GL_VIEWPORT, viewport)
-        np_unproject(x, y, 1.0, mvmat, pmat, viewport, px, py, pz)
-        ray_far = (px.value, py.value, pz.value)
-        np_unproject(x, y, 0.0, mvmat, pmat, viewport, px, py, pz)
-        ray_near = (px.value, py.value, pz.value)
+        viewport = (0.0, 0.0, self.width, self.height)
+
+        ray_far = np_unproject(x, y, 1.0, mvmat, pmat, viewport)
+        ray_near = np_unproject(x, y, 0.0, mvmat, pmat, viewport)
         return ray_near, ray_far
 
     def mouse_to_plane(self, x: float, y: float,

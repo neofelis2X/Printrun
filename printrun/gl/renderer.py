@@ -22,7 +22,7 @@ from pyglet.gl import GLfloat, GLuint, \
                       glDrawArrays, glDrawRangeElements, \
                       GL_VERTEX_ARRAY, GL_ELEMENT_ARRAY_BUFFER, \
                       GL_UNSIGNED_INT, GL_FLOAT, GL_TRIANGLES, GL_LINES, \
-                      GL_ARRAY_BUFFER, GL_STATIC_DRAW, GL_FALSE, \
+                      GL_ARRAY_BUFFER, GL_STATIC_DRAW, GL_FALSE, GL_TRUE, \
                       GL_CULL_FACE, GL_LINE_SMOOTH, GL_LINE_WIDTH, \
                       glGenVertexArrays, glBindVertexArray, glGenBuffers, \
                       glBindBuffer, glBufferData, glEnableVertexAttribArray, \
@@ -46,14 +46,13 @@ def load_shader():
 
 def load_mvp_uniform(shader_id, camera, actor):
     if actor.is_3d:
-        modelmatrix = actor.modelmatrix
-        mat = camera.projection @ camera.view @ modelmatrix
+        mat = camera.projection @ camera.view @ actor.modelmatrix
     else:
         mat = camera.projection2d
 
     location = glGetUniformLocation(shader_id, b"modelViewProjection")
     ptr = mat.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
-    glUniformMatrix4fv(location, 1, GL_FALSE, ptr)
+    glUniformMatrix4fv(location, 1, GL_TRUE, ptr)
 
 def interleave_vertex_data(verts, color):
     data = []
@@ -65,7 +64,7 @@ def interleave_vertex_data(verts, color):
 
 def create_buffers():
     """
-    Creates and sets up VAO, VBO and EBO and fills data into the EBO.
+    Creates and sets up VAO, VBO and EBO.
     Returns handles to VAO, VBO, EBO.
     """
     vao = GLuint(0)

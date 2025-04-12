@@ -133,6 +133,44 @@ def quat_rotate_vec_dev(quat: Tuple[float, float, float, float],
 
     return vecs_out
 
+def mat4_orthographic(left: float, right: float, bottom: float, top: float,
+                      z_near: float, z_far: float) -> np.ndarray:
+    """
+    Returns a 4x4 orthographic matrix
+    """
+
+    matrix = np.identity(4, dtype=np.float32)
+    tx = - (right + left) / (right - left)
+    ty = - (top + bottom) / (top - bottom)
+    tz = - (z_far + z_near) / (z_far - z_near)
+
+    matrix[0][0] = 2 / (right - left)
+    matrix[1][1] = 2 / (top - bottom)
+    matrix[2][2] = - 2 / (z_far - z_near)
+    matrix[0][3] = tx
+    matrix[1][3] = ty
+    matrix[2][3] = tz
+
+    return matrix
+
+def mat4_perspective(fov_deg: float, aspect: float,
+                     z_near: float, z_far: float) -> np.ndarray:
+    """
+    Returns a 4x4 perspective matrix
+    """
+
+    matrix = np.identity(4, dtype=np.float32)
+    f = 1.0 / np.tan(np.deg2rad(fov_deg) / 2.0)
+
+    matrix[0][0] = f / aspect
+    matrix[1][1] = f
+    matrix[2][2] = (z_near + z_far) / (z_near - z_far)
+    matrix[2][3] = (2 * z_near * z_far) / (z_near - z_far)
+    matrix[3][2] = -1.0
+    matrix[3][3] = 0.0
+
+    return matrix
+
 def mat4_translation(x_val: float, y_val: float,
                      z_val: float) -> np.ndarray:
     """
@@ -140,9 +178,9 @@ def mat4_translation(x_val: float, y_val: float,
     """
 
     matrix = np.identity(4, dtype=np.float32)
-    matrix[3][0] = x_val
-    matrix[3][1] = y_val
-    matrix[3][2] = z_val
+    matrix[0][3] = x_val
+    matrix[1][3] = y_val
+    matrix[2][3] = z_val
 
     return matrix
 
@@ -165,7 +203,7 @@ def mat4_rotation(x: float, y: float,
     matrix[1][2] = y * z * (1 - co) + x * si
     matrix[2][2] = z * z * (1 - co) + co
 
-    return matrix
+    return matrix.T
 
 def mat4_scaling(x_val: float, y_val: float, z_val: float) -> np.ndarray:
     """
@@ -183,10 +221,10 @@ def pyg_to_np_mat4(pyg_matrix) -> np.ndarray:
     """
     Converts a pyglet Mat4() matrix into a numpy array.
     """
-    return np.array((*pyg_matrix.column(0),
-                     *pyg_matrix.column(1),
-                     *pyg_matrix.column(2),
-                     *pyg_matrix.column(3)), dtype=np.float32)
+    return np.array((pyg_matrix.row(0),
+                     pyg_matrix.row(1),
+                     pyg_matrix.row(2),
+                     pyg_matrix.row(3)), dtype=np.float32)
 
 def np_to_gl_mat(np_matrix: np.ndarray) -> Array:
     """
@@ -197,9 +235,9 @@ def np_to_gl_mat(np_matrix: np.ndarray) -> Array:
     return array_type(*np_matrix.reshape((np_matrix.size, 1)))
 
 def np_unproject(winx: float, winy: float, winz: float,
-                 mv_mat: Array, p_mat: Array,
-                 viewport: Array, pointx: c_double,
-                 pointy: c_double, pointz: c_double) -> bool:
+                 mv_mat: np.ndarray, p_mat: np.ndarray,
+                 viewport: Tuple[float, float, float, float]
+                 ) -> Tuple[float, float, float]:
     '''
     gluUnProject in Python with numpy. This is a direct
     implementation of the Khronos OpenGL Wiki code:
@@ -210,15 +248,11 @@ def np_unproject(winx: float, winy: float, winz: float,
         mv_mat: Model-view matrix as a ctypes array.
         p_mat: Projection matrix as a ctypes array.
         viewport: Viewport as a ctypes array [x, y, width, height].
-        pointx, pointy, pointz: Output variables for object coordinates.
 
     Returns:
         bool: True if successful, False otherwise.
     '''
-    modelview_mat = np.asarray(mv_mat).reshape((4, 4))
-    projection_mat = np.asarray(p_mat).reshape((4, 4))
-
-    mat_a = projection_mat.T @ modelview_mat.T
+    mat_a = p_mat @ mv_mat
 
     try:
         mat_inv = inv(mat_a)
@@ -227,8 +261,8 @@ def np_unproject(winx: float, winy: float, winz: float,
 
     # Normalized screen coordinates between -1 and 1
     coords_in = np.zeros(4)
-    coords_in[0] = (winx - float(viewport[0])) / float(viewport[2]) * 2.0 - 1.0
-    coords_in[1] = (winy - float(viewport[1])) / float(viewport[3]) * 2.0 - 1.0
+    coords_in[0] = (winx - viewport[0]) / viewport[2] * 2.0 - 1.0
+    coords_in[1] = (winy - viewport[1]) / viewport[3] * 2.0 - 1.0
     coords_in[2] = 2.0 * winz - 1.0
     coords_in[3] = 1.0
 
@@ -238,8 +272,9 @@ def np_unproject(winx: float, winy: float, winz: float,
         return False
 
     coords_out[3] = 1.0 / coords_out[3]
-    pointx.value = coords_out[0] * coords_out[3]
-    pointy.value = coords_out[1] * coords_out[3]
-    pointz.value = coords_out[2] * coords_out[3]
-    return True
+    pointx = coords_out[0] * coords_out[3]
+    pointy = coords_out[1] * coords_out[3]
+    pointz = coords_out[2] * coords_out[3]
+
+    return pointx, pointy, pointz
 
