@@ -268,6 +268,7 @@ class wxGLPanel(BASE_CLASS):
         sh = renderer.load_shader()
         self.shader["basic"] = sh
         self.focus.load()
+        self.platform.load()
         #self._setup_lights()
         #self._setup_material()
 
@@ -379,7 +380,8 @@ class wxGLPanel(BASE_CLASS):
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         self.shader["basic"].use()
 
-        #self.platform.draw()
+        renderer.load_mvp_uniform(self.shader["basic"].id, self.camera, self.platform)
+        self.platform.draw()
         self.draw_objects()
 
         if self.canvas.HasFocus():

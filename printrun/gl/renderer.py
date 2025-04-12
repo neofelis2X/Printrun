@@ -54,11 +54,14 @@ def load_mvp_uniform(shader_id, camera, actor):
     ptr = mat.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
     glUniformMatrix4fv(location, 1, GL_TRUE, ptr)
 
-def interleave_vertex_data(verts, color):
+def interleave_vertex_data(verts, color, individual_colors=False):
     data = []
-    for vertex in verts:
+    for i, vertex in enumerate(verts):
         data.extend(vertex)
-        data.extend(color)
+        if individual_colors:
+            data.extend(color[i])
+        else:
+            data.extend(color)
 
     return data
 
