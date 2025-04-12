@@ -141,6 +141,10 @@ class ActorBaseClass(ABC):
         return self._modelmatrix
 
     @abstractmethod
+    def load(self):
+        ...
+
+    @abstractmethod
     def draw(self):
         ...
 
@@ -174,10 +178,14 @@ class Platform(ActorBaseClass):
 
         self.vertices = ()
         self.indices = ()
-        self.colors = ()
+        self.color = ()
         self._initialise_data()
 
         self.loaded = True
+
+    @property
+    def modelmatrix(self):
+        return self._modelmatrix
 
     def update_colour(self, bg_color: Tuple[float, float, float]) -> None:
         '''Update the color of the platform grid based on the
@@ -192,6 +200,7 @@ class Platform(ActorBaseClass):
         self.color_major = blend_colors(bg_color, base_color, 0.33)
 
         self._initialise_data()
+        self._update_vbo()
 
     def _color(self, i: float) -> Tuple:
         if i % self.grid[1] == 0:
@@ -202,15 +211,24 @@ class Platform(ActorBaseClass):
             return ()
         return self.color_minor
 
-    def _get_transformation(self) -> Array:
-        mat = mat4_translation(self.xoffset, self.yoffset, self.zoffset)
-        return np_to_gl_mat(mat)
-
     def _initialise_data(self):
+        self._modelmatrix = mat4_translation(self.xoffset,
+                                             self.yoffset,
+                                             self.zoffset)
         if self.is_circular:
             self._load_circular()
         else:
             self._load_rectangular()
+
+    def _update_vbo(self):
+        vb = renderer.interleave_vertex_data(self.vertices, self.color,
+                                             individual_colors=True)
+        renderer.fill_buffer(self.vbo, vb, GL_ARRAY_BUFFER)
+
+    def load(self):
+        self.vao, self.vbo, self.ebo = renderer.create_buffers()
+        renderer.fill_buffer(self.ebo, self.indices, GL_ELEMENT_ARRAY_BUFFER)
+        self._update_vbo()
 
     def _origin_arrows(self) -> Tuple[float, float, float]:
         arrow_offset = self.width * 0.01
@@ -300,7 +318,7 @@ class Platform(ActorBaseClass):
 
         self.vertices = vertices
         self.indices = indices
-        self.colors = colors
+        self.color = colors
 
     def _load_rectangular(self):
         z_height = -0.01
@@ -339,23 +357,13 @@ class Platform(ActorBaseClass):
         indices.extend(abs_idxs)
         self.indices = indices
         colors.extend(op_cols)
-        self.colors = colors
+        self.color = colors
 
     def draw(self) -> None:
-        glPushMatrix()
-        glMultMatrixd(self._get_transformation())
-
         # draw the grid
-        glDisable(GL_LIGHTING)
-
-        glBegin(GL_LINES)
-        for index in self.indices:
-            glColor4f(*self.colors[index])
-            glVertex3f(*self.vertices[index])
-        glEnd()
-
-        glPopMatrix()
-        glEnable(GL_LIGHTING)
+        #glDisable(GL_LIGHTING)
+        glBindVertexArray(self.vao)
+        glDrawElements(GL_LINES, len(self.indices), GL_UNSIGNED_INT, 0)
 
 
 class MouseCursor(ActorBaseClass):
@@ -523,6 +531,9 @@ class CuttingPlane(ActorBaseClass):
         self.indices = (0, 1, 2, 3, 0, 2,
                         2, 1, 1, 0, 0, 3, 3, 2)
 
+    def load(self):
+        pass
+
     def update_plane(self, axis: str, cutting_direction: int) -> None:
         self.axis = axis
         self.cutting_direction = cutting_direction
@@ -624,6 +635,8 @@ class MeshModel(ActorBaseClass):
 
         model.batch = self.batch  # type: ignore
         """
+    def load(self):
+        pass
 
     def delete(self) -> None:
         if self.vl:
