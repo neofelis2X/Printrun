@@ -54,14 +54,19 @@ def load_mvp_uniform(shader_id, camera, actor):
     ptr = mat.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
     glUniformMatrix4fv(location, 1, GL_TRUE, ptr)
 
-def interleave_vertex_data(verts, color, individual_colors=False):
+def interleave_vertex_data(verts, color, normal, distinct_colors=False,
+                           distinct_normals=False):
     data = []
     for i, vertex in enumerate(verts):
         data.extend(vertex)
-        if individual_colors:
+        if distinct_colors:
             data.extend(color[i])
         else:
             data.extend(color)
+        if distinct_normals:
+            data.extend(normal[i])
+        else:
+            data.extend(normal)
 
     return data
 
@@ -83,10 +88,13 @@ def create_buffers():
     glBindBuffer(GL_ARRAY_BUFFER, vbo)
 
     glEnableVertexAttribArray(0)  # Vertex position
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 7 * ctypes.sizeof(GLfloat), 0)
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 10 * ctypes.sizeof(GLfloat), 0)
     glEnableVertexAttribArray(1)  # Vertex colour
-    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 7 * ctypes.sizeof(GLfloat),
+    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 10 * ctypes.sizeof(GLfloat),
                           3 * ctypes.sizeof(GLfloat))
+    glEnableVertexAttribArray(2)  # Vertex normal direction
+    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 10 * ctypes.sizeof(GLfloat),
+                          7 * ctypes.sizeof(GLfloat))
 
     # Index buffer object
     glGenBuffers(1, ebo)
