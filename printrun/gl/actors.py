@@ -47,7 +47,7 @@ from pyglet.gl.gl_compat import glPushMatrix, glPopMatrix, glMultMatrixd, \
                         GL_LINE_STIPPLE, GL_NORMAL_ARRAY, \
                         GL_LIGHTING, GL_COLOR_ARRAY
 
-from .mathutils import mat4_translation, mat4_rotation, np_to_gl_mat
+from .mathutils import mat4_translation, mat4_rotation, mat4_scaling, np_to_gl_mat
 
 from pyglet.graphics.vertexbuffer import BufferObject
 from pyglet.graphics import Batch
@@ -200,7 +200,6 @@ class Platform(ActorBaseClass):
         self.color_major = blend_colors(bg_color, base_color, 0.33)
 
         self._initialise_data()
-        self._update_vbo()
 
     def _color(self, i: float) -> Tuple:
         if i % self.grid[1] == 0:
@@ -603,42 +602,49 @@ class MeshModel(ActorBaseClass):
     def __init__(self, model: stltool.stl) -> None:
         super().__init__()
         self.color = (77 / 255, 178 / 255, 128 / 255, 1.0)  # Greenish
-        # Every model is placed into it's own batch.
-        # This is not ideal, but good enough for the moment.
-        self.batch = Batch()
-        self.vl = None
-        self._initialise_data(model)
+        self.indices = []
+        self.meshdata = model
 
-    def _initialise_data(self, model: stltool.stl) -> None:
+    def load(self):
+        self.vao, self.vbo, self.ebo = renderer.create_buffers()
+        self._initialise_data()
+        self.update()
+
+    def update(self):
+        model = self.meshdata
+        tm = mat4_translation(*model.offsets)
+        rm = mat4_rotation(0.0, 0.0, 1.0, model.rot)
+        tc = mat4_translation(*model.centeroffset)
+        sm = mat4_scaling(*model.scale)
+        mat = sm.T @ tc.T @ rm.T @ tm.T
+
+        self._modelmatrix = mat.T.copy()
+
+    def _initialise_data(self) -> None:
         # Create the vertex and normal arrays.
+        # TODO: The whole data pipeline here can surely be optimised.
         vertices = []
         normals = []
 
-        for facet in model.facets:
-            for coords in facet[1]:
-                vertices.extend(coords)
-                normals.extend(facet[0])
+        for facet in self.meshdata.facets:
+            for vertex in facet[1]:
+                vertices.append(vertex.tolist())
+                normals.append(facet[0].tolist())
 
-        """
-        self.vl = self.batch.add(len(vertices) // 3,
-                                GL_TRIANGLES,
-                                None,  # group
-                                ('v3f/static', vertices),
-                                ('n3f/static', normals),
-                                ('c3f/static', self.color[:-1] * (len(vertices) // 3)))
+        vb = renderer.interleave_vertex_data(vertices, self.color, normals,
+                                             distinct_normals=True)
+        renderer.fill_buffer(self.vbo, vb, GL_ARRAY_BUFFER)
 
-        model.batch = self.batch  # type: ignore
-        """
-    def load(self):
-        pass
-
-    def delete(self) -> None:
-        if self.vl:
-            self.vl.delete()
+        # TODO: This is pointless, create proper indices for meshes
+        self.indices = range(len(vb) // 10)
+        renderer.fill_buffer(self.ebo, self.indices, GL_ELEMENT_ARRAY_BUFFER)
 
     def draw(self) -> None:
-        if self.vl:
-            self.vl.draw(GL_TRIANGLES)
+        glBindVertexArray(self.vao)
+        glDrawElements(GL_TRIANGLES, len(self.indices), GL_UNSIGNED_INT, 0)
+
+    def delete(self) -> None:
+        pass
 
 
 class Model:
