@@ -221,8 +221,9 @@ class Platform(ActorBaseClass):
             self._load_rectangular()
 
     def _update_vbo(self):
+        normal = (0.0, 0.0, 0.1)
         vb = renderer.interleave_vertex_data(self.vertices, self.color,
-                                             individual_colors=True)
+                                             normal, distinct_colors=True)
         renderer.fill_buffer(self.vbo, vb, GL_ARRAY_BUFFER)
 
     def load(self):
@@ -362,6 +363,7 @@ class Platform(ActorBaseClass):
     def draw(self) -> None:
         # draw the grid
         #glDisable(GL_LIGHTING)
+        glEnable(GL_LINE_SMOOTH)
         glBindVertexArray(self.vao)
         glDrawElements(GL_LINES, len(self.indices), GL_UNSIGNED_INT, 0)
 
@@ -388,7 +390,8 @@ class MouseCursor(ActorBaseClass):
 
     def load(self):
         self.vao, self.vbo, self.ebo = renderer.create_buffers()
-        vb = renderer.interleave_vertex_data(self.vertices, self.color)
+        normal = (0.0, 0.0, 1.0)
+        vb = renderer.interleave_vertex_data(self.vertices, self.color, normal)
         renderer.fill_buffer(self.vbo, vb, GL_ARRAY_BUFFER)
         renderer.fill_buffer(self.ebo, self.indices, GL_ELEMENT_ARRAY_BUFFER)
 
@@ -476,8 +479,8 @@ class Focus(ActorBaseClass):
                          (self.camera.width - offset, offset, 0.0),
                          (self.camera.width - offset, self.camera.height - offset, 0.0),
                          (offset, self.camera.height - offset, 0.0))
-
-        vs = renderer.interleave_vertex_data(self.vertices, self.color)
+        normal = (0.0, 0.0, 1.0)
+        vs = renderer.interleave_vertex_data(self.vertices, self.color, normal)
         renderer.fill_buffer(self.vbo, vs, GL_ARRAY_BUFFER)
 
     def update_colour(self, bg_color: Tuple[float, float, float]) -> None:
@@ -494,6 +497,7 @@ class Focus(ActorBaseClass):
         # # Draw a stippled line around the vertices
         # glLineStipple(1, 0xff00)
         # glEnable(GL_LINE_STIPPLE)
+        # TODO: Draw stippled line with line shader
         glBindVertexArray(self.vao)
         glDrawElements(GL_LINES, len(self.indices), GL_UNSIGNED_INT, 0)
 
@@ -505,15 +509,15 @@ class CuttingPlane(ActorBaseClass):
     """
     def __init__(self, build_dimensions: Build_Dims) -> None:
         super().__init__()
-        self.width = build_dimensions[0]
-        self.depth = build_dimensions[1]
-        self.height = build_dimensions[2]
+        self.width = float(build_dimensions[0])
+        self.depth = float(build_dimensions[1])
+        self.height = float(build_dimensions[2])
         self.cutplane_sizes = {"x": (self.depth, self.height),
-                                    "y": (self.width, self.height),
-                                    "z": (self.width, self.depth)}
-        self.axis = ''
+                               "y": (self.width, self.height),
+                               "z": (self.width, self.depth)}
+        self.axis = 'x'
         self.dist = 0.0
-        self.cutting_direction = -1
+        self.cutting_direction = -1.0
         self.plane_width = 0.0
         self.plane_height = 0.0
 
@@ -523,77 +527,67 @@ class CuttingPlane(ActorBaseClass):
         self.color_outline = (0 / 255, 204 / 255, 38 / 255, 1.0)  # Green
 
     def _initialise_data(self) -> None:
-        self.vertices = ((self.plane_width, self.plane_height, 0.0),
+        self.vertices = 2 * ((self.plane_width, self.plane_height, 0.0),
                          (0.0, self.plane_height, 0.0),
-                         (0.0, 0.0, 0.0),
-                         (self.plane_width, 0.0, 0.0))
+                         (0.0, 0.2, 0.0),
+                         (self.plane_width, 0.2, 0.0))
 
-        self.indices = (0, 1, 2, 3, 0, 2,
-                        2, 1, 1, 0, 0, 3, 3, 2)
+        colors = 4 * [self.color] + 4 * [self.color_outline]
+        normal = (0.0, 0.0, self.cutting_direction)
+        vb = renderer.interleave_vertex_data(self.vertices, colors, normal,
+                                             distinct_colors=True)
+        renderer.fill_buffer(self.vbo, vb, GL_ARRAY_BUFFER)
 
     def load(self):
-        pass
+        self.vao, self.vbo, self.ebo = renderer.create_buffers()
+
+        self.indices = (0, 1, 2, 3, 0, 2,  # plane
+                        6, 5, 5, 4, 4, 7, 7, 6)  # outline
+        renderer.fill_buffer(self.ebo, self.indices, GL_ELEMENT_ARRAY_BUFFER)
 
     def update_plane(self, axis: str, cutting_direction: int) -> None:
         self.axis = axis
-        self.cutting_direction = cutting_direction
+        self.cutting_direction = float(cutting_direction)
         self.plane_width, self.plane_height = self.cutplane_sizes[axis]
         self._initialise_data()
 
     def update_position(self, dist: float) -> None:
         self.dist = dist
+        if self.dist is None:
+            return
 
-    def _get_transformation(self) -> Array:
+        # TODO: Utilise transforms (scale) instead of vertex reupload
         if self.axis == "x":
             rm1 = mat4_rotation(0.0, 1.0, 0.0, 90.0)
             rm2 = mat4_rotation(0.0, 0.0, 1.0, 90.0)
             tm = mat4_translation(0.0, 0.0, self.dist)
-            mat = tm @ rm2 @ rm1
+            mat = tm.T @ rm2.T @ rm1.T
+            mat = mat.T.copy()
         elif self.axis == "y":
             rm = mat4_rotation(1.0, 0.0, 0.0, 90.0)
             tm = mat4_translation(0.0, 0.0, -self.dist)
-            mat = tm @ rm
+            mat = tm.T @ rm.T
+            mat = mat.T.copy()
         elif self.axis == "z":
             mat = mat4_translation(0.0, 0.0, self.dist)
         else:
             mat = np.identity(4)
 
-        return np_to_gl_mat(mat)
+        self._modelmatrix = mat
 
     def draw(self) -> None:
         if self.dist is None:
             return
 
-        glPushMatrix()
-        glMultMatrixd(self._get_transformation())
-        glDisable(GL_CULL_FACE)
         # Draw the plane
-        glColor4f(*self.color)
-        glNormal3f(0.0, 0.0, self.cutting_direction)
-
-        glBegin(GL_TRIANGLES)
-        for index in self.indices[:6]:
-            glVertex3f(*self.vertices[index])
-        glEnd()
-
+        glDisable(GL_CULL_FACE)
+        glBindVertexArray(self.vao)
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0)
         glEnable(GL_CULL_FACE)
-        glEnable(GL_LINE_SMOOTH)
-
-        # Save the current linewidth and insert a new value
-        orig_linewidth = (GLfloat)()
-        glGetFloatv(GL_LINE_WIDTH, orig_linewidth)
-        glLineWidth(4.0)
         # Draw the outline on the plane
-        glColor4f(*self.color_outline)
-
-        glBegin(GL_LINES)
-        for index in self.indices[6:]:
-            glVertex3f(*self.vertices[index])
-        glEnd()
-        # Restore the original linewidth
-        glLineWidth(orig_linewidth)
-        glDisable(GL_LINE_SMOOTH)
-        glPopMatrix()
+        # TODO: Draw a thick outline with lineshader
+        glEnable(GL_LINE_SMOOTH)
+        glDrawElements(GL_LINES, 8, GL_UNSIGNED_INT, 6 * sizeof(GLuint))
 
 
 # TODO: It would be nice to have a visual representation of the printhead
