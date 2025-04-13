@@ -75,6 +75,7 @@ class StlViewPanel(wxGLPanel):
         super().OnInitGL(call_reshape, *args, **kwargs)
 
         self.gl_cursor.load()
+        self.cutting_plane.load()
 
         if hasattr(self.parent, "filenames") and self.parent.filenames:
             for filename in self.parent.filenames:
@@ -147,19 +148,20 @@ class StlViewPanel(wxGLPanel):
         #     # Apply transformations and draw the models
         #     self.transform_and_draw(model, model.batch.draw)
         #
-        # # Draw cutting plane
-        # if self.parent.cutting:
-        #     axis = self.parent.cutting_axis
-        #     fixed_dist = self.parent.cutting_dist
-        #     dist = self.get_cutting_dist(axis, fixed_dist)
-        #
-        #     if dist is not None:
-        #         direction = self.parent.cutting_direction
-        #         # TODO: Check if plane has even changed (use buttonEvent?)
-        #         self.cutting_plane.update_plane(axis, direction)
-        #         self.cutting_plane.update_position(dist)
-        #         self.cutting_plane.draw()
-        #
+        # Draw cutting plane
+        if self.parent.cutting:
+            axis = self.parent.cutting_axis
+            fixed_dist = self.parent.cutting_dist
+            dist = self.get_cutting_dist(axis, fixed_dist)
+
+            if dist is not None:
+                direction = self.parent.cutting_direction
+                # TODO: Check if plane has even changed (use buttonEvent?)
+                self.cutting_plane.update_plane(axis, direction)
+                self.cutting_plane.update_position(dist)
+                renderer.load_mvp_uniform(self.shader["basic"].id, self.camera, self.cutting_plane)
+                self.cutting_plane.draw()
+
     # ==========================================================================
     # Utils
     # ==========================================================================
