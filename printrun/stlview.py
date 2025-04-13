@@ -76,6 +76,9 @@ class StlViewPanel(wxGLPanel):
 
         self.gl_cursor.load()
         self.cutting_plane.load()
+        for i in self.parent.models:
+            model = self.parent.models[i].batch
+            model.load()
 
         if hasattr(self.parent, "filenames") and self.parent.filenames:
             for filename in self.parent.filenames:
@@ -141,13 +144,16 @@ class StlViewPanel(wxGLPanel):
             self.gl_cursor.position = intersection
             renderer.load_mvp_uniform(self.shader["basic"].id, self.camera, self.gl_cursor)
             self.gl_cursor.draw()
-        #
-        # # Draw objects
-        # for i in self.parent.models:
-        #     model = self.parent.models[i]
+
+        # Draw objects
+        for i in self.parent.models:
+            model = self.parent.models[i].batch
+            #model.update()
+            renderer.load_mvp_uniform(self.shader["basic"].id, self.camera, model)
+            model.draw()
         #     # Apply transformations and draw the models
-        #     self.transform_and_draw(model, model.batch.draw)
-        #
+        #     #self.transform_and_draw(model, model.batch.draw)
+
         # Draw cutting plane
         if self.parent.cutting:
             axis = self.parent.cutting_axis
@@ -275,9 +281,9 @@ def main() -> None:
                               -(modeldata.dims[3] + modeldata.dims[2]) / 2,
                               0.0]
     modeldata.scale = [1.0, 1.0, 0.6]
+    modeldata.batch = actors.MeshModel(modeldata)
 
     frame.models = {'example': modeldata}
-    actors.MeshModel(modeldata)
 
     frame.Show(True)
     app.MainLoop()
