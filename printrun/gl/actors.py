@@ -628,8 +628,13 @@ class MeshModel(ActorBaseClass):
 
         for facet in self.meshdata.facets:
             for vertex in facet[1]:
-                vertices.append(vertex.tolist())
-                normals.append(facet[0].tolist())
+                if isinstance(vertex, list):
+                    # FIXME: binary stls are loaded differently -> fix stltool.stl
+                    vertices.append(vertex)
+                    normals.append(facet[0])
+                else:
+                    vertices.append(vertex.tolist())
+                    normals.append(facet[0].tolist())
 
         vb = renderer.interleave_vertex_data(vertices, self.color, normals,
                                              distinct_normals=True)
