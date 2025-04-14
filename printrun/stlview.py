@@ -128,6 +128,8 @@ class StlViewPanel(wxGLPanel):
     def prepare_model(self, m: stltool.stl, scale: float) -> None:
         self.set_current_context()
         mesh = actors.MeshModel(m)
+        m.batch = mesh
+        m.batch.load()
         self.meshmodels.append(mesh)
         # m.animoffset = 300
         # threading.Thread(target = self.anim, args = (m, )).start()
@@ -148,7 +150,8 @@ class StlViewPanel(wxGLPanel):
         # Draw objects
         for i in self.parent.models:
             model = self.parent.models[i].batch
-            #model.update()
+            # FIXME: transformation shouldnt be updated every frame.
+            model.update()
             renderer.load_mvp_uniform(self.shader["basic"].id, self.camera, model)
             model.draw()
         #     # Apply transformations and draw the models
