@@ -257,10 +257,7 @@ def main() -> None:
     size = wx.Size(600, 450)
     frame = TestFrame(None, -1, "Mesh GL Window", size = size)
     frame.SetMinClientSize((200, 200))
-    persp = False
-
-    if 2 < len(sys.argv):
-        persp = sys.argv[2] == "perspective"
+    persp = "perspective" in sys.argv
 
     stl_panel = StlViewPanel(frame, size,
                              circular = False,
