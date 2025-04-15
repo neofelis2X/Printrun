@@ -652,7 +652,7 @@ class MeshModel(ActorBaseClass):
         pass
 
 
-class Model:
+class Model(ActorBaseClass):
     """
     Parent class for models that provides common functionality.
     """
@@ -1191,7 +1191,9 @@ class GcodeModel(Model):
     # DRAWING
     # ------------------------------------------------------------------------
 
-    def init(self) -> None:
+    def load(self, shader) -> None:
+        self.shader = shader
+
         with self.lock:
             self.layers_loaded = self.max_layers
             self.initialized = True
@@ -1220,7 +1222,7 @@ class GcodeModel(Model):
         mat = mat4_translation(self.offset_x, self.offset_y, 0.0)
         return np_to_gl_mat(mat)
 
-    def display(self, mode_2d: bool = False) -> None:
+    def draw(self, mode_2d: bool = False) -> None:
         with self.lock:
             glPushMatrix()
             glMultMatrixd(self._get_transformation())
@@ -1285,8 +1287,7 @@ class GcodeModel(Model):
         self.vertex_normal_buffer.bind()
         glNormalPointer(GL_FLOAT, 0, self.vertex_normal_buffer.ptr)
 
-        # Pyglet 2.0: target=GL_ELEMENT_ARRAY_BUFFER
-        self.index_buffer.bind()
+        self.index_buffer.bind(target=GL_ELEMENT_ARRAY_BUFFER)
 
         # Prevent race condition by using the number of currently loaded layers
         max_layers = self.layers_loaded
@@ -1346,6 +1347,7 @@ class GcodeModel(Model):
         self.vertex_color_buffer.unbind()
         self.vertex_normal_buffer.unbind()
 
+
 class GcodeModelLight(Model):
     """
     Model for displaying Gcode data.
@@ -1354,12 +1356,12 @@ class GcodeModelLight(Model):
     color_travel = (0.6, 0.6, 0.6, 0.6)
     color_tool0 = (1.0, 0.0, 0.0, 0.6)
     color_tool1 = (0.67, 0.05, 0.9, 0.6)
-    color_tool2 = (1.0, 0.8, 0., 0.6)
-    color_tool3 = (1.0, 0., 0.62, 0.6)
-    color_tool4 = (0., 1.0, 0.58, 0.6)
-    color_printed = (0.2, 0.75, 0, 0.6)
-    color_current = (0, 0.9, 1.0, 0.8)
-    color_current_printed = (0.1, 0.4, 0, 0.8)
+    color_tool2 = (1.0, 0.8, 0.0, 0.6)
+    color_tool3 = (1.0, 0.0, 0.62, 0.6)
+    color_tool4 = (0.0, 1.0, 0.58, 0.6)
+    color_printed = (0.2, 0.75, 0.0, 0.6)
+    color_current = (0.0, 0.9, 1.0, 0.8)
+    color_current_printed = (0.1, 0.4, 0.0, 0.8)
 
     buffers_created = False
     loaded = False
@@ -1485,47 +1487,42 @@ class GcodeModelLight(Model):
     # DRAWING
     # ------------------------------------------------------------------------
 
-    def init(self) -> None:
+    def load(self, shader) -> None:
+        self.shader = shader
+        self._modelmatrix = mat4_translation(self.offset_x, self.offset_y, 0.0)
+
         with self.lock:
             self.layers_loaded = self.max_layers
             self.initialized = True
             if self.buffers_created:
-                self.vertex_buffer.delete()
-                self.vertex_color_buffer.delete()
-            self.vertex_buffer = numpy2vbo(self.vertices)
-            # each pair of vertices shares the color
-            self.vertex_color_buffer = numpy2vbo(self.colors)
+                #self.vertex_buffer.delete()
+                #self.vertex_color_buffer.delete()
+                return
+
+            self.vao, self.vbo, self.ebo = renderer.create_buffers()
+            normal = (0.0, 0.0, 1.0)
+            vb = renderer.interleave_vertex_data(self.vertices.reshape(-1, 3),
+                                                 self.colors.reshape(-1, 4),
+                                                 normal,
+                                                 distinct_colors=True)
+            renderer.fill_buffer(self.vbo, vb, GL_ARRAY_BUFFER)
+
+            #indices = range(len(vb) // 10)
+            #renderer.fill_buffer(self.ebo, indices, GL_ELEMENT_ARRAY_BUFFER)
+
             if self.fully_loaded:
                 # Delete numpy arrays after creating VBOs after full load
                 self.vertices = np.zeros(0, dtype = GLfloat)
                 self.colors = np.zeros(0, dtype = GLfloat)
+
             self.buffers_created = True
 
-    def _get_transformation(self) -> Array:
-        mat = mat4_translation(self.offset_x, self.offset_y, 0.0)
-        return np_to_gl_mat(mat)
-
-    def display(self, mode_2d: bool = False) -> None:
+    def draw(self, mode_2d: bool = False) -> None:
+        glBindVertexArray(self.vao)
         with self.lock:
-            glPushMatrix()
-            glMultMatrixd(self._get_transformation())
-
-            glEnableClientState(GL_VERTEX_ARRAY)
-            glEnableClientState(GL_COLOR_ARRAY)
-
             self._display_movements(mode_2d)
 
-            glDisableClientState(GL_COLOR_ARRAY)
-            glDisableClientState(GL_VERTEX_ARRAY)
-            glPopMatrix()
-
     def _display_movements(self, mode_2d: bool = False) -> None:
-        self.vertex_buffer.bind()
-        glVertexPointer(3, GL_FLOAT, 0, None)
-
-        self.vertex_color_buffer.bind()
-        glColorPointer(4, GL_FLOAT, 0, None)
-
         # Prevent race condition by using the number of currently loaded layers
         max_layers = self.layers_loaded
 
@@ -1536,9 +1533,9 @@ class GcodeModelLight(Model):
             end_prev_layer = -1
         end = self.layer_stops[min(self.num_layers_to_draw, max_layers)]
 
-        glDisableClientState(GL_COLOR_ARRAY)
-
-        glColor4f(*self.color_printed)
+        #glColor4f(*self.color_printed)
+        renderer.load_uniform(self.shader.id, "doOverwriteColor", 1)
+        renderer.load_uniform(self.shader.id, "oColor", self.color_printed)
 
         # Draw printed stuff until end or end_prev_layer
         cur_end = min(self.printed_until, end)
@@ -1548,7 +1545,7 @@ class GcodeModelLight(Model):
             elif cur_end >= 0:
                 glDrawArrays(GL_LINES, start, cur_end)
 
-        glEnableClientState(GL_COLOR_ARRAY)
+        renderer.load_uniform(self.shader.id, "doOverwriteColor", 0)
 
         # Draw nonprinted stuff until end_prev_layer
         start = max(cur_end, 0)
@@ -1559,27 +1556,29 @@ class GcodeModelLight(Model):
 
         # Draw current layer
         if end_prev_layer >= 0:
-            glDisableClientState(GL_COLOR_ARRAY)
-
             # Backup & increase line width
-            orig_linewidth = (GLfloat)()
-            glGetFloatv(GL_LINE_WIDTH, orig_linewidth)
-            glLineWidth(2.0)
+            #orig_linewidth = (GLfloat)()
+            #glGetFloatv(GL_LINE_WIDTH, orig_linewidth)
+            #glLineWidth(2.0)
 
-            glColor4f(*self.color_current_printed)
+            #glColor4f(*self.color_current_printed)
+            renderer.load_uniform(self.shader.id, "doOverwriteColor", 1)
+            renderer.load_uniform(self.shader.id, "oColor",
+                                  self.color_current_printed)
 
             if cur_end > end_prev_layer:
                 glDrawArrays(GL_LINES, end_prev_layer, cur_end - end_prev_layer)
 
-            glColor4f(*self.color_current)
+            #glColor4f(*self.color_current)
+            renderer.load_uniform(self.shader.id, "oColor",
+                                  self.color_current)
 
             if end > cur_end:
                 glDrawArrays(GL_LINES, cur_end, end - cur_end)
 
+            renderer.load_uniform(self.shader.id, "doOverwriteColor", 0)
             # Restore line width
-            glLineWidth(orig_linewidth)
-
-            glEnableClientState(GL_COLOR_ARRAY)
+            #glLineWidth(orig_linewidth)
 
         # Draw non printed stuff until end (if not ending at a given layer)
         start = max(self.printed_until, 0)
@@ -1587,5 +1586,6 @@ class GcodeModelLight(Model):
         if end_prev_layer < 0 < end and not self.only_current:
             glDrawArrays(GL_LINES, start, end)
 
-        self.vertex_buffer.unbind()
-        self.vertex_color_buffer.unbind()
+        #self.vertex_buffer.unbind()
+        #self.vertex_color_buffer.unbind()
+

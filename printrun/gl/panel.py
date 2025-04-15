@@ -31,7 +31,7 @@ from pyglet.gl import GLint, GLdouble, glEnable,glBlendFunc,glViewport, \
     glGetIntegerv, glPolygonMode, glGetUniformLocation, glUniformMatrix4fv, \
     GL_LEQUAL, GL_ONE_MINUS_SRC_ALPHA,GL_DEPTH_BUFFER_BIT, \
     GL_SRC_ALPHA, GL_BLEND, GL_COLOR_BUFFER_BIT, GL_CULL_FACE, \
-    GL_VIEWPORT, GL_FRONT_AND_BACK,GL_DEPTH_TEST, GL_FILL, GL_FALSE
+    GL_VIEWPORT, GL_FRONT_AND_BACK,GL_DEPTH_TEST, GL_FILL, GL_FALSE, GL_LESS
 
 #
 # # those are legacy calls which need to be replaced
@@ -258,9 +258,8 @@ class wxGLPanel(BASE_CLASS):
         # normal gl init
         glClearColor(*self.color_background)
         glClearDepth(1.0)  # set depth value to 1
-        glDepthFunc(GL_LEQUAL)
-
         glEnable(GL_DEPTH_TEST)
+        glDepthFunc(GL_LESS)
         glEnable(GL_CULL_FACE)
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)

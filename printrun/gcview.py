@@ -17,11 +17,13 @@
 
 import sys
 import logging
+from pathlib import Path
 import wx
 
 from . import gcoder
 from .gl.panel import wxGLPanel
 from .gl import actors
+from .gl import renderer
 from .injectgcode import injector, injector_edit
 
 from .gviz import GvizBaseFrame, BaseViz
@@ -118,25 +120,26 @@ class GcodeViewPanel(wxGLPanel):
         for obj in self.parent.objects:
             if obj.model and obj.model.loaded and not obj.model.initialized:
                 self.set_current_context()
-                obj.model.init()
+                obj.model.load(self.shader["basic"])
 
     def draw_objects(self) -> None:
         '''called in the middle of ondraw after the buffer has been cleared'''
         self.create_objects()
 
         for obj in self.parent.objects:
-            if not obj.model \
-               or not obj.model.loaded:
+            if not obj.model or not obj.model.loaded:
                 continue
             # Skip (comment out) initialized check, which safely causes empty
             # model during progressive load. This can cause exceptions/garbage
             # render, but seems fine for now
-            # May need to lock init() and draw_objects() together
+            # May need to lock load() and draw_objects() together
             # if not obj.model.initialized:
             #     continue
 
             # Apply transformations and draw the models
-            self.transform_and_draw(obj, obj.model.display)
+            #self.transform_and_draw(obj, obj.model.display)
+            renderer.load_mvp_uniform(self.shader["basic"].id, self.camera, obj.model)
+            obj.model.draw()
 
     # ==========================================================================
     # Utils
@@ -203,7 +206,7 @@ class GcodeViewLoader:
 
     def addfile_perlayer(self, gcode: Optional[gcoder.GCode] = None, showall: bool = False) -> Iterator[Union[int, None]]:
         self.model = create_model(self.root.settings.light3d
-                                  if self.root else False)
+                                  if self.root else True)
         if isinstance(self.model, actors.GcodeModel):
             self.model.set_path_size(self.path_halfwidth, self.path_halfheight)
         self.objects[-1].model = self.model
@@ -410,17 +413,32 @@ class GcodeViewFrame(GvizBaseFrame, GcodeViewLoader):
         wx.CallAfter(self.Refresh)
 
 if __name__ == "__main__":
+    GCODE_TESTMODEL = Path(__file__, "../../testfiles/testgeometry.gcode").resolve()
     app = wx.App(redirect = False)
 
     build_dimensions = (200, 200, 100, 0, 0, 0)
     title = _("G-Code Viewer")
-    frame = GcodeViewFrame(None, wx.ID_ANY, title, size = (600, 450),
+    persp = "perspective" in sys.argv
+
+    frame = GcodeViewFrame(None, wx.ID_ANY, title, size = (700, 600),
                            build_dimensions = build_dimensions,
                            antialias_samples = 4,
                            circular = False,
-                           perspective = False)
+                           perspective = persp)
+    frame.SetMinClientSize((200, 200))
+    #frame.root.settings.light3d = True
 
-    with open(sys.argv[1], 'r', encoding = 'UTF-8') as file:
+    frame.glpanel.show_frametime = True
+    frame.glpanel.init_frametime()
+    frame.glpanel.set_current_context()
+
+    # Load a stl model via cmd line argument
+    if 1 < len(sys.argv) and Path(sys.argv[1]).is_file():
+        testfile = sys.argv[1]
+    else :
+        testfile = GCODE_TESTMODEL
+
+    with open(testfile, 'r', encoding = 'UTF-8') as file:
         gcode = gcoder.GCode(file, get_home_pos(build_dimensions))
 
     frame.addfile(gcode)
