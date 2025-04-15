@@ -27,7 +27,8 @@ from pyglet.gl import GLfloat, GLuint, \
                       glGenVertexArrays, glBindVertexArray, glGenBuffers, \
                       glBindBuffer, glBufferData, glEnableVertexAttribArray, \
                       glVertexAttribPointer, GL_UNSIGNED_INT, glDrawElements, \
-                      glGetUniformLocation, glUniformMatrix4fv
+                      glGetUniformLocation, glUniformMatrix4fv, glUniform1i, \
+                      glUniform4f
 
 
 def load_shader():
@@ -53,6 +54,16 @@ def load_mvp_uniform(shader_id, camera, actor):
     location = glGetUniformLocation(shader_id, b"modelViewProjection")
     ptr = mat.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
     glUniformMatrix4fv(location, 1, GL_TRUE, ptr)
+
+def load_uniform(shader_id, uniform_name: str, data):
+    location = glGetUniformLocation(shader_id, uniform_name.encode())
+    if location == -1:
+        print("Could not find Uniform location.")
+        return
+    if uniform_name == "doOverwriteColor":
+        glUniform1i(location, data)
+    elif uniform_name == "oColor":
+        glUniform4f(location, *data)
 
 def interleave_vertex_data(verts, color, normal, distinct_colors=False,
                            distinct_normals=False):
