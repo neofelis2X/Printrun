@@ -206,7 +206,7 @@ class GcodeViewLoader:
 
     def addfile_perlayer(self, gcode: Optional[gcoder.GCode] = None, showall: bool = False) -> Iterator[Union[int, None]]:
         self.model = create_model(self.root.settings.light3d
-                                  if self.root else True)
+                                  if self.root else False)
         if isinstance(self.model, actors.GcodeModel):
             self.model.set_path_size(self.path_halfwidth, self.path_halfheight)
         self.objects[-1].model = self.model

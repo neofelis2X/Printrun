@@ -853,7 +853,7 @@ class GcodeModel(Model):
         # to store coordinates/colors/normals.
         # Nicely enough we have 3 per kind of thing for all kinds.
         coordspervertex = 3
-        buffered_color_len = 3  # 4th color component (alpha) is ignored
+        buffered_color_len = 4  # alpha is the 4th color component 
         verticesperline = 8
         coordsperline = coordspervertex * verticesperline
 
@@ -1089,7 +1089,7 @@ class GcodeModel(Model):
                             vertex_k += new_vertices_len
 
                             new_vertices_count = new_vertices_len // coordspervertex
-                            # settings support alpha (transparency), but it is ignored here
+                            # alpha (transparency) is included here
                             gline_color = self.movement_color(gline)[:buffered_color_len]
                             for vi in range(new_vertices_count):
                                 colors[color_k : color_k + buffered_color_len] = gline_color
@@ -1184,8 +1184,10 @@ class GcodeModel(Model):
                     colors[cur_vertex * 3 : cur_vertex * 3 + 3] = gline_color
                     cur_vertex += 1
         if self.vertex_color_buffer:
-            self.vertex_color_buffer.delete()
-        self.vertex_color_buffer = numpy2vbo(colors)
+            pass
+            #self.vertex_color_buffer.delete()
+        # TODO: Find a solution to update the colors
+        #self.vertex_color_buffer = numpy2vbo(colors)
 
     # ------------------------------------------------------------------------
     # DRAWING
@@ -1193,22 +1195,35 @@ class GcodeModel(Model):
 
     def load(self, shader) -> None:
         self.shader = shader
+        self._modelmatrix = mat4_translation(self.offset_x, self.offset_y, 0.0)
 
         with self.lock:
             self.layers_loaded = self.max_layers
             self.initialized = True
             if self.buffers_created:
-                self.travel_buffer.delete()
-                self.index_buffer.delete()
-                self.vertex_buffer.delete()
-                self.vertex_color_buffer.delete()
-                self.vertex_normal_buffer.delete()
-            self.travel_buffer = numpy2vbo(self.travels)
-            self.index_buffer = numpy2vbo(self.indices,
-                                          target = GL_ELEMENT_ARRAY_BUFFER)
-            self.vertex_buffer = numpy2vbo(self.vertices)
-            self.vertex_color_buffer = numpy2vbo(self.colors)
-            self.vertex_normal_buffer = numpy2vbo(self.normals)
+                #self.travel_buffer.delete()
+                #self.index_buffer.delete()
+                #self.vertex_buffer.delete()
+                #self.vertex_color_buffer.delete()
+                #self.vertex_normal_buffer.delete()
+                return
+            self.vao, self.vbo, self.ebo = renderer.create_buffers()
+
+            vb = renderer.interleave_vertex_data(self.vertices.reshape(-1, 3),
+                                                 self.colors.reshape(-1, 4),
+                                                 self.normals.reshape(-1, 3),
+                                                 distinct_colors=True,
+                                                 distinct_normals=True)
+
+            # TODO: Can this all go into one buffer? Would be more elegant.
+            self.vao_travels, self.vbo_travels, _ = renderer.create_buffers(create_ebo=False)
+            vb_travels = renderer.interleave_vertex_data(self.travels.reshape(-1, 3),
+                                                         self.color_travel,
+                                                         (0.0, 0.0, 1.0))
+            renderer.fill_buffer(self.vbo, vb, GL_ARRAY_BUFFER)
+            renderer.fill_buffer(self.vbo_travels, vb_travels, GL_ARRAY_BUFFER)
+            renderer.fill_buffer(self.ebo, self.indices.data, GL_ELEMENT_ARRAY_BUFFER)
+
             if self.fully_loaded:
                 # Delete numpy arrays after creating VBOs after full load
                 self.travels = np.zeros(0, dtype = GLfloat)
@@ -1218,44 +1233,23 @@ class GcodeModel(Model):
                 self.normals = np.zeros(0, dtype = GLfloat)
             self.buffers_created = True
 
-    def _get_transformation(self) -> Array:
-        mat = mat4_translation(self.offset_x, self.offset_y, 0.0)
-        return np_to_gl_mat(mat)
-
     def draw(self, mode_2d: bool = False) -> None:
         with self.lock:
-            glPushMatrix()
-            glMultMatrixd(self._get_transformation())
-
-            glEnableClientState(GL_VERTEX_ARRAY)
 
             if self.display_travels:
                 self._display_travels()
 
-            glEnable(GL_LIGHTING)
-            glEnableClientState(GL_NORMAL_ARRAY)
-            glEnableClientState(GL_COLOR_ARRAY)
-
             self._display_movements()
 
-            glDisable(GL_LIGHTING)
-
-            glDisableClientState(GL_COLOR_ARRAY)
-            glDisableClientState(GL_VERTEX_ARRAY)
-            glDisableClientState(GL_NORMAL_ARRAY)
-
-            glPopMatrix()
-
     def _display_travels(self) -> None:
-        self.travel_buffer.bind()
-        glVertexPointer(3, GL_FLOAT, 0, self.travel_buffer.ptr)
+        glBindVertexArray(self.vao_travels)
 
         # Prevent race condition by using the number of currently loaded layers
         max_layers = self.layers_loaded
+
         # TODO: show current layer travels in a different color
         end = self.layer_stops[min(self.num_layers_to_draw, max_layers)]
         end_index = self.count_travel_indices[end]
-        glColor4f(*self.color_travel)
         if self.only_current:
             if self.num_layers_to_draw < max_layers:
                 end_prev_layer = self.layer_stops[self.num_layers_to_draw - 1]
@@ -1263,8 +1257,6 @@ class GcodeModel(Model):
                 glDrawArrays(GL_LINES, start_index, end_index - start_index + 1)
         else:
             glDrawArrays(GL_LINES, 0, end_index)
-
-        self.travel_buffer.unbind()
 
     def _draw_elements(self, start: int, end: int, draw_type = GL_TRIANGLES) -> None:
         # Don't attempt printing empty layer
@@ -1278,17 +1270,7 @@ class GcodeModel(Model):
                             sizeof(GLuint) * self.count_print_indices[start - 1])
 
     def _display_movements(self) -> None:
-        self.vertex_buffer.bind()
-        glVertexPointer(3, GL_FLOAT, 0, self.vertex_buffer.ptr)
-
-        self.vertex_color_buffer.bind()
-        glColorPointer(3, GL_FLOAT, 0, self.vertex_color_buffer.ptr)
-
-        self.vertex_normal_buffer.bind()
-        glNormalPointer(GL_FLOAT, 0, self.vertex_normal_buffer.ptr)
-
-        self.index_buffer.bind(target=GL_ELEMENT_ARRAY_BUFFER)
-
+        glBindVertexArray(self.vao)
         # Prevent race condition by using the number of currently loaded layers
         max_layers = self.layers_loaded
 
@@ -1300,9 +1282,8 @@ class GcodeModel(Model):
             end_prev_layer = 0
         end = self.layer_stops[min(self.num_layers_to_draw, max_layers)]
 
-        glDisableClientState(GL_COLOR_ARRAY)
-
-        glColor3f(*self.color_printed[:-1])
+        renderer.load_uniform(self.shader.id, "doOverwriteColor", 1)
+        renderer.load_uniform(self.shader.id, "oColor", self.color_printed)
 
         # Draw printed stuff until end or end_prev_layer
         cur_end = min(self.printed_until, end)
@@ -1312,7 +1293,7 @@ class GcodeModel(Model):
             elif cur_end >= 1:
                 self._draw_elements(1, cur_end)
 
-        glEnableClientState(GL_COLOR_ARRAY)
+        renderer.load_uniform(self.shader.id, "doOverwriteColor", 0)
 
         # Draw nonprinted stuff until end_prev_layer
         start = max(cur_end, 1)
@@ -1323,29 +1304,23 @@ class GcodeModel(Model):
 
         # Draw current layer
         if layer_selected:
-            glDisableClientState(GL_COLOR_ARRAY)
-
-            glColor3f(*self.color_current_printed[:-1])
+            renderer.load_uniform(self.shader.id, "doOverwriteColor", 1)
+            renderer.load_uniform(self.shader.id, "oColor", self.color_current_printed)
 
             if cur_end > end_prev_layer:
                 self._draw_elements(end_prev_layer + 1, cur_end)
 
-            glColor3f(*self.color_current[:-1])
+            renderer.load_uniform(self.shader.id, "oColor", self.color_current)
 
             if end > cur_end:
                 self._draw_elements(cur_end + 1, end)
 
-            glEnableClientState(GL_COLOR_ARRAY)
+            renderer.load_uniform(self.shader.id, "doOverwriteColor", 0)
 
         # Draw non printed stuff until end (if not ending at a given layer)
         start = max(self.printed_until, 1)
         if not layer_selected and end >= start:
             self._draw_elements(start, end)
-
-        self.index_buffer.unbind()
-        self.vertex_buffer.unbind()
-        self.vertex_color_buffer.unbind()
-        self.vertex_normal_buffer.unbind()
 
 
 class GcodeModelLight(Model):
@@ -1499,16 +1474,14 @@ class GcodeModelLight(Model):
                 #self.vertex_color_buffer.delete()
                 return
 
-            self.vao, self.vbo, self.ebo = renderer.create_buffers()
+            # TODO: Indexed data would be nice to have?
+            self.vao, self.vbo, _ = renderer.create_buffers(create_ebo=False)
             normal = (0.0, 0.0, 1.0)
             vb = renderer.interleave_vertex_data(self.vertices.reshape(-1, 3),
                                                  self.colors.reshape(-1, 4),
                                                  normal,
                                                  distinct_colors=True)
             renderer.fill_buffer(self.vbo, vb, GL_ARRAY_BUFFER)
-
-            #indices = range(len(vb) // 10)
-            #renderer.fill_buffer(self.ebo, indices, GL_ELEMENT_ARRAY_BUFFER)
 
             if self.fully_loaded:
                 # Delete numpy arrays after creating VBOs after full load
@@ -1533,7 +1506,6 @@ class GcodeModelLight(Model):
             end_prev_layer = -1
         end = self.layer_stops[min(self.num_layers_to_draw, max_layers)]
 
-        #glColor4f(*self.color_printed)
         renderer.load_uniform(self.shader.id, "doOverwriteColor", 1)
         renderer.load_uniform(self.shader.id, "oColor", self.color_printed)
 
@@ -1561,7 +1533,6 @@ class GcodeModelLight(Model):
             #glGetFloatv(GL_LINE_WIDTH, orig_linewidth)
             #glLineWidth(2.0)
 
-            #glColor4f(*self.color_current_printed)
             renderer.load_uniform(self.shader.id, "doOverwriteColor", 1)
             renderer.load_uniform(self.shader.id, "oColor",
                                   self.color_current_printed)
@@ -1569,7 +1540,6 @@ class GcodeModelLight(Model):
             if cur_end > end_prev_layer:
                 glDrawArrays(GL_LINES, end_prev_layer, cur_end - end_prev_layer)
 
-            #glColor4f(*self.color_current)
             renderer.load_uniform(self.shader.id, "oColor",
                                   self.color_current)
 
