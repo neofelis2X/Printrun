@@ -18,18 +18,12 @@ import ctypes
 from pyglet.graphics import shader
 
 from pyglet.gl import GLfloat, GLuint, \
-                      glEnable, glDisable, glGetFloatv, glLineWidth, \
-                      glDrawArrays, glDrawRangeElements, \
-                      GL_VERTEX_ARRAY, GL_ELEMENT_ARRAY_BUFFER, \
-                      GL_UNSIGNED_INT, GL_FLOAT, GL_TRIANGLES, GL_LINES, \
-                      GL_ARRAY_BUFFER, GL_STATIC_DRAW, GL_FALSE, GL_TRUE, \
-                      GL_CULL_FACE, GL_LINE_SMOOTH, GL_LINE_WIDTH, \
+                      GL_ELEMENT_ARRAY_BUFFER, GL_FLOAT, GL_ARRAY_BUFFER, \
+                      GL_STATIC_DRAW, GL_FALSE, GL_TRUE, \
                       glGenVertexArrays, glBindVertexArray, glGenBuffers, \
                       glBindBuffer, glBufferData, glEnableVertexAttribArray, \
-                      glVertexAttribPointer, GL_UNSIGNED_INT, glDrawElements, \
-                      glGetUniformLocation, glUniformMatrix4fv, glUniform1i, \
-                      glUniform4f
-
+                      glVertexAttribPointer, glGetUniformLocation, \
+                      glUniformMatrix4fv, glUniform1i, glUniform4f
 
 def load_shader():
     vert_source = Path("printrun/assets/shader/basic.vert.glsl")

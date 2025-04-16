@@ -16,7 +16,6 @@
 import logging
 import time
 import traceback
-import ctypes
 
 import wx
 from wx import glcanvas
@@ -26,26 +25,16 @@ import pyglet
 pyglet.options['debug_gl'] = True
 pyglet.options['shadow_window'] = False
 
-from pyglet.gl import GLint, GLdouble, glEnable,glBlendFunc,glViewport, \
-    glClear, glClearColor, glClearDepth, glDepthFunc, glGetDoublev, \
-    glGetIntegerv, glPolygonMode, glGetUniformLocation, glUniformMatrix4fv, \
-    GL_LEQUAL, GL_ONE_MINUS_SRC_ALPHA,GL_DEPTH_BUFFER_BIT, \
-    GL_SRC_ALPHA, GL_BLEND, GL_COLOR_BUFFER_BIT, GL_CULL_FACE, \
-    GL_VIEWPORT, GL_FRONT_AND_BACK,GL_DEPTH_TEST, GL_FILL, GL_FALSE, GL_LESS
+from pyglet.gl import glEnable,glBlendFunc,glViewport, glClear, \
+                      glClearColor, glClearDepth, glDepthFunc, \
+                      GL_ONE_MINUS_SRC_ALPHA,GL_DEPTH_BUFFER_BIT, \
+                      GL_SRC_ALPHA, GL_BLEND, GL_COLOR_BUFFER_BIT, \
+                      GL_CULL_FACE, GL_DEPTH_TEST, GL_LESS, GL_LINE_SMOOTH
 
-#
-# # those are legacy calls which need to be replaced
-# from pyglet.gl import GL_LIGHTING, GL_LIGHT0, GL_LIGHT1, GL_POSITION, \
-#     GL_DIFFUSE, GL_AMBIENT, GL_SPECULAR, GL_COLOR_MATERIAL, GL_SMOOTH, \
-#     GL_NORMALIZE, GL_PROJECTION_MATRIX, GL_AMBIENT_AND_DIFFUSE, \
-#     GL_SHININESS, GL_EMISSION, GL_MODELVIEW, \
-#     glMaterialf, glColorMaterial, glMaterialfv, glLightfv, glShadeModel, \
-#     glPushMatrix, glPopMatrix, glMultMatrixd, glMatrixMode
-#
 from pyglet import gl
 
-from .mathutils import vec, np_unproject, np_to_gl_mat, \
-                       mat4_translation, mat4_rotation, mat4_scaling
+from .mathutils import np_unproject, np_to_gl_mat, mat4_translation, \
+                       mat4_rotation, mat4_scaling
 from . import renderer
 from . import actors
 from . import camera
@@ -55,7 +44,7 @@ from printrun.utils import install_locale
 install_locale("pronterface")
 
 # for type hints
-from typing import TYPE_CHECKING, Any, Tuple, Union, Callable, Optional
+from typing import TYPE_CHECKING, Any, Tuple, Union, Callable
 from printrun import stltool
 from printrun import gcoder
 Build_Dims = Tuple[int, int, int, int, int, int]
@@ -263,6 +252,7 @@ class wxGLPanel(BASE_CLASS):
         glEnable(GL_CULL_FACE)
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        glEnable(GL_LINE_SMOOTH)
 
         sh = renderer.load_shader()
         self.shader["basic"] = sh
@@ -313,45 +303,7 @@ class wxGLPanel(BASE_CLASS):
                 factor = 1.0
 
             self.camera.zoom(factor)
-    #
-    # def _setup_lights(self) -> None:
-    #     '''Sets the lightscene for gcode and stl models'''
-    #     glEnable(GL_LIGHTING)
-    #
-    #     glEnable(GL_LIGHT0)
-    #     glLightfv(GL_LIGHT0, GL_AMBIENT, vec(0.0, 0.0, 0.0, 1.0))
-    #     glLightfv(GL_LIGHT0, GL_SPECULAR, vec(0.6, 0.6, 0.6, 1.0))
-    #     glLightfv(GL_LIGHT0, GL_DIFFUSE, vec(0.7, 0.7, 0.7, 1.0))
-    #     glLightfv(GL_LIGHT0, GL_POSITION, vec(0.9, 2.8, 1.7, 0.0))
-    #
-    #     glEnable(GL_LIGHT1)
-    #     glLightfv(GL_LIGHT1, GL_AMBIENT, vec(0.0, 0.0, 0.0, 1.0))
-    #     glLightfv(GL_LIGHT1, GL_SPECULAR, vec(0.6, 0.6, 0.6, 1.0))
-    #     glLightfv(GL_LIGHT1, GL_DIFFUSE, vec(0.7, 0.7, 0.7, 1.0))
-    #     glLightfv(GL_LIGHT1, GL_POSITION, vec(-1.2, -1.0, 2.2, 0.0))
-    #
-    #     glEnable(GL_NORMALIZE)
-    #     glShadeModel(GL_SMOOTH)
-    #
-    # def _setup_material(self) -> None:
-    #     '''Sets the material attributes for all objects'''
-    #
-    #     # Switch this two lines to show models as wireframe
-    #     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
-    #     # glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
-    #
-    #     # Material specs are set here once and only the
-    #     # the material colour is changed later
-    #     glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE, vec(0.5, 0.1, 0.3, 1.0))
-    #     glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, vec(0.35, 0.35, 0.35, 1.0))
-    #     glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, 80.0)
-    #     glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION, vec(0.0, 0.0, 0.0, 1.0))
-    #
-    #     # This enables tracking of the material colour,
-    #     # now it can be changed only by calling glColor
-    #     glEnable(GL_COLOR_MATERIAL)
-    #     glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE)
-    #
+
     def resetview(self) -> None:
         self.set_current_context()
         self.camera.reset_view_matrix()
@@ -395,6 +347,7 @@ class wxGLPanel(BASE_CLASS):
 
     def transform_and_draw(self, model: Union['GCObject', stltool.stl],
                            draw_function: Callable[[], None]) -> None:
+        # TODO: Cleanup and delete
         '''Apply transformations to the model and then
         draw it with the given draw function'''
         modelmat = self._load_model_matrix(model)
@@ -402,6 +355,7 @@ class wxGLPanel(BASE_CLASS):
         draw_function()
 
     def _load_model_matrix(self, model: Union['GCObject', stltool.stl]):
+        # TODO: Cleanup and delete
         tm = mat4_translation(*model.offsets)
         rm = mat4_rotation(0.0, 0.0, 1.0, model.rot)
         tc = mat4_translation(*model.centeroffset)
