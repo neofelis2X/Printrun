@@ -17,8 +17,8 @@ from threading import Lock
 
 import numpy as np
 
-from .mathutils import vec_length, trackball, mat4_orthographic, mat4_perspective, \
-                       mulquat, axis_to_quat, quat_rotate_vec
+from .mathutils import vec_length, mulquat, trackball, mat4_orthographic, \
+                       mat4_perspective, axis_to_quat, quat_rotate_vec
 
 # for type hints
 from typing import Optional, Tuple, TYPE_CHECKING

@@ -15,12 +15,11 @@
 
 import math
 import numpy as np
-from numpy.linalg import inv
 from pyglet import gl
 
 # for type hints
 from typing import List, Tuple
-from ctypes import Array, c_int, c_double, c_float
+from ctypes import Array
 
 def vec(*args: float) -> Array:
     '''Returns an array of GLfloat values'''
@@ -231,7 +230,7 @@ def np_to_gl_mat(np_matrix: np.ndarray) -> Array:
     Converts a numpy matrix into a c_types_Array which
     can be directly passed into OpenGL calls.
     """
-    array_type = c_double * np_matrix.size
+    array_type = gl.GLdouble * np_matrix.size
     return array_type(*np_matrix.reshape((np_matrix.size, 1)))
 
 def np_unproject(winx: float, winy: float, winz: float,
@@ -255,7 +254,7 @@ def np_unproject(winx: float, winy: float, winz: float,
     mat_a = p_mat @ mv_mat
 
     try:
-        mat_inv = inv(mat_a)
+        mat_inv = np.linalg.inv(mat_a)
     except np.linalg.LinAlgError:
         return False
 
@@ -270,6 +269,7 @@ def np_unproject(winx: float, winy: float, winz: float,
     coords_out = mat_inv @ coords_in
     if coords_out[3] == 0.0:
         return False
+    # TODO: Fix return schema.
 
     coords_out[3] = 1.0 / coords_out[3]
     pointx = coords_out[0] * coords_out[3]

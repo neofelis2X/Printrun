@@ -27,30 +27,12 @@ from abc import ABC, abstractmethod
 from ctypes import sizeof
 
 from pyglet.gl import GLfloat, GLuint, \
-                      glEnable, glDisable, glGetFloatv, glLineWidth, \
-                      glDrawArrays, glDrawRangeElements, \
-                      GL_VERTEX_ARRAY, GL_ELEMENT_ARRAY_BUFFER, \
-                      GL_UNSIGNED_INT, GL_FLOAT, GL_TRIANGLES, GL_LINES, \
-                      GL_ARRAY_BUFFER, GL_STATIC_DRAW, GL_FALSE, \
-                      GL_CULL_FACE, GL_LINE_SMOOTH, GL_LINE_WIDTH, \
-                      glGenVertexArrays, glBindVertexArray, glGenBuffers, \
-                      glBindBuffer, glBufferData, glEnableVertexAttribArray, \
-                      glVertexAttribPointer, GL_UNSIGNED_INT, glDrawElements
+                      GL_ARRAY_BUFFER, GL_ELEMENT_ARRAY_BUFFER, \
+                      GL_UNSIGNED_INT, GL_TRIANGLES, GL_LINES, GL_CULL_FACE, \
+                      glEnable, glDisable, glDrawArrays, glDrawElements, \
+                      glDrawRangeElements, glBindVertexArray
 
-
-# those are legacy calls which need to be replaced
-from pyglet.gl.gl_compat import glPushMatrix, glPopMatrix, glMultMatrixd, \
-                        glColor4f, glVertex3f, glBegin, glEnd, \
-                        glVertexPointer, glColorPointer, glEnableClientState, \
-                        glDisableClientState, glNormalPointer, glColor3f, \
-                        glNormal3f, glLineStipple, \
-                        GL_LINE_STIPPLE, GL_NORMAL_ARRAY, \
-                        GL_LIGHTING, GL_COLOR_ARRAY
-
-from .mathutils import mat4_translation, mat4_rotation, mat4_scaling, np_to_gl_mat
-
-from pyglet.graphics.vertexbuffer import BufferObject
-from pyglet.graphics import Batch
+from .mathutils import mat4_translation, mat4_rotation, mat4_scaling
 
 from . import camera
 from . import renderer
@@ -60,18 +42,10 @@ install_locale("pronterface")
 
 # for type hints
 from typing import Union, Any, Tuple, List, Iterator
-from ctypes import Array
 from printrun import stltool
 from printrun import gcoder
 Build_Dims = Tuple[int, int, int, int, int, int]
 
-def numpy2vbo(nparray: np.ndarray, target = GL_ARRAY_BUFFER,
-              usage = GL_STATIC_DRAW) -> BufferObject:
-
-    vbo = BufferObject(nparray.nbytes, usage=usage)
-    vbo.bind(target=target)
-    vbo.set_data(nparray.ctypes.data)
-    return vbo
 
 def triangulate_rectangle(i1: int, i2: int, i3: int, i4: int) -> List[int]:
     return [i1, i4, i3, i3, i2, i1]
@@ -360,9 +334,6 @@ class Platform(ActorBaseClass):
         self.color = colors
 
     def draw(self) -> None:
-        # draw the grid
-        #glDisable(GL_LIGHTING)
-        glEnable(GL_LINE_SMOOTH)
         glBindVertexArray(self.vao)
         glDrawElements(GL_LINES, len(self.indices), GL_UNSIGNED_INT, 0)
 
@@ -436,7 +407,6 @@ class MouseCursor(ActorBaseClass):
         return (vertices, indices)
 
     def draw(self) -> None:
-        #glNormal3f(0.0, 0.0, 1.0)
         glDisable(GL_CULL_FACE)
         glBindVertexArray(self.vao)
         glDrawElements(GL_TRIANGLES, len(self.indices), GL_UNSIGNED_INT, 0)
@@ -585,7 +555,6 @@ class CuttingPlane(ActorBaseClass):
         glEnable(GL_CULL_FACE)
         # Draw the outline on the plane
         # TODO: Draw a thick outline with lineshader
-        glEnable(GL_LINE_SMOOTH)
         glDrawElements(GL_LINES, 8, GL_UNSIGNED_INT, 6 * sizeof(GLuint))
 
 
@@ -812,14 +781,14 @@ class GcodeModel(Model):
     Model for displaying Gcode data.
     """
 
-    color_travel = (0.6, 0.6, 0.6, 0.6)
-    color_tool0 = (1.0, 0.0, 0.0, 1.0)
-    color_tool1 = (0.67, 0.05, 0.9, 1.0)
-    color_tool2 = (1.0, 0.8, 0., 1.0)
-    color_tool3 = (1.0, 0., 0.62, 1.0)
-    color_tool4 = (0., 1.0, 0.58, 1.0)
-    color_printed = (0.2, 0.75, 0, 1.0)
-    color_current = (0, 0.9, 1.0, 1.0)
+    color_travel =  (0.6, 0.6, 0.6, 0.6)
+    color_tool0 =   (1.0, 0.0, 0.0, 1.0)
+    color_tool1 =   (0.67, 0.05, 0.9, 1.0)
+    color_tool2 =   (1.0, 0.8, 0.0, 1.0)
+    color_tool3 =   (1.0, 0.0, 0.62, 1.0)
+    color_tool4 =   (0.0, 1.0, 0.58, 1.0)
+    color_printed = (0.2, 0.75, 0.0, 1.0)
+    color_current = (0.0, 0.9, 1.0, 1.0)
     color_current_printed = (0.1, 0.4, 0, 1.0)
 
     display_travels = True
@@ -853,7 +822,7 @@ class GcodeModel(Model):
         # to store coordinates/colors/normals.
         # Nicely enough we have 3 per kind of thing for all kinds.
         coordspervertex = 3
-        buffered_color_len = 4  # alpha is the 4th color component 
+        buffered_color_len = 4  # alpha is the 4th color component
         verticesperline = 8
         coordsperline = coordspervertex * verticesperline
 
@@ -1328,12 +1297,12 @@ class GcodeModelLight(Model):
     Model for displaying Gcode data.
     """
 
-    color_travel = (0.6, 0.6, 0.6, 0.6)
-    color_tool0 = (1.0, 0.0, 0.0, 0.6)
-    color_tool1 = (0.67, 0.05, 0.9, 0.6)
-    color_tool2 = (1.0, 0.8, 0.0, 0.6)
-    color_tool3 = (1.0, 0.0, 0.62, 0.6)
-    color_tool4 = (0.0, 1.0, 0.58, 0.6)
+    color_travel =  (0.6, 0.6, 0.6, 0.6)
+    color_tool0 =   (1.0, 0.0, 0.0, 0.6)
+    color_tool1 =   (0.67, 0.05, 0.9, 0.6)
+    color_tool2 =   (1.0, 0.8, 0.0, 0.6)
+    color_tool3 =   (1.0, 0.0, 0.62, 0.6)
+    color_tool4 =   (0.0, 1.0, 0.58, 0.6)
     color_printed = (0.2, 0.75, 0.0, 0.6)
     color_current = (0.0, 0.9, 1.0, 0.8)
     color_current_printed = (0.1, 0.4, 0.0, 0.8)
