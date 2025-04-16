@@ -81,20 +81,18 @@ def interleave_vertex_data(verts, color, normal, distinct_colors=False,
 
     return data
 
-def create_buffers():
+def create_buffers(create_ebo=True):
     """
     Creates and sets up VAO, VBO and EBO.
     Returns handles to VAO, VBO, EBO.
     """
-    vao = GLuint(0)
-    vbo = GLuint(0)
-    ebo = GLuint(0)
-
     # Vertex array object
+    vao = GLuint(0)
     glGenVertexArrays(1, vao)
     glBindVertexArray(vao)
 
     # Vertex buffer object
+    vbo = GLuint(0)
     glGenBuffers(1, vbo)
     glBindBuffer(GL_ARRAY_BUFFER, vbo)
 
@@ -107,9 +105,13 @@ def create_buffers():
     glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 10 * ctypes.sizeof(GLfloat),
                           7 * ctypes.sizeof(GLfloat))
 
-    # Index buffer object
-    glGenBuffers(1, ebo)
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo)
+    if create_ebo:
+        # Index buffer object
+        ebo = GLuint(0)
+        glGenBuffers(1, ebo)
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo)
+    else:
+        ebo = None
 
     return vao, vbo, ebo
 
