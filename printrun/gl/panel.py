@@ -345,25 +345,6 @@ class wxGLPanel(BASE_CLASS):
             self.frametime.end_frame()
             self.frametime_counter.SetLabel(self.frametime.get())
 
-    def transform_and_draw(self, model: Union['GCObject', stltool.stl],
-                           draw_function: Callable[[], None]) -> None:
-        # TODO: Cleanup and delete
-        '''Apply transformations to the model and then
-        draw it with the given draw function'''
-        modelmat = self._load_model_matrix(model)
-        # Draw the models
-        draw_function()
-
-    def _load_model_matrix(self, model: Union['GCObject', stltool.stl]):
-        # TODO: Cleanup and delete
-        tm = mat4_translation(*model.offsets)
-        rm = mat4_rotation(0.0, 0.0, 1.0, model.rot)
-        tc = mat4_translation(*model.centeroffset)
-        sm = mat4_scaling(*model.scale)
-        mat = sm @ tc @ rm @ tm
-
-        return np_to_gl_mat(mat)
-
     # ==========================================================================
     # To be implemented by a sub class
     # ==========================================================================

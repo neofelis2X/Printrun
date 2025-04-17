@@ -154,8 +154,6 @@ class StlViewPanel(wxGLPanel):
             model.update()
             renderer.load_mvp_uniform(self.shader["basic"].id, self.camera, model)
             model.draw()
-        #     # Apply transformations and draw the models
-        #     #self.transform_and_draw(model, model.batch.draw)
 
         # Draw cutting plane
         if self.parent.cutting:

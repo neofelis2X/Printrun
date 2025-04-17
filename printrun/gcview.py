@@ -127,19 +127,19 @@ class GcodeViewPanel(wxGLPanel):
         self.create_objects()
 
         for obj in self.parent.objects:
-            if not obj.model or not obj.model.loaded:
+            model = obj.model
+            if not model or not model.loaded:
                 continue
             # Skip (comment out) initialized check, which safely causes empty
             # model during progressive load. This can cause exceptions/garbage
             # render, but seems fine for now
             # May need to lock load() and draw_objects() together
-            # if not obj.model.initialized:
+            # if not model.initialized:
             #     continue
 
-            # Apply transformations and draw the models
-            #self.transform_and_draw(obj, obj.model.display)
-            renderer.load_mvp_uniform(self.shader["basic"].id, self.camera, obj.model)
-            obj.model.draw()
+            model.update(obj)
+            renderer.load_mvp_uniform(self.shader["basic"].id, self.camera, model)
+            model.draw()
 
     # ==========================================================================
     # Utils
@@ -197,6 +197,8 @@ class GCObject:
         self.curlayer = 0.0
         self.scale = [1.0, 1.0, 1.0]
         self.model = model
+        self.gcode: Optional[gcoder.GCode] = None
+        self.dims = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 
 
 class GcodeViewLoader:
