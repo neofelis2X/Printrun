@@ -15,6 +15,7 @@
 
 from pathlib import Path
 import ctypes
+import numpy as np
 from pyglet.graphics import shader
 
 from pyglet.gl import GLfloat, GLuint, \
@@ -46,7 +47,7 @@ def load_mvp_uniform(shader_id, camera, actor):
         mat = camera.projection2d
 
     location = glGetUniformLocation(shader_id, b"modelViewProjection")
-    ptr = mat.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+    ptr = mat.ctypes.data_as(ctypes.POINTER(GLfloat))
     glUniformMatrix4fv(location, 1, GL_TRUE, ptr)
 
 def load_uniform(shader_id, uniform_name: str, data):
@@ -61,17 +62,19 @@ def load_uniform(shader_id, uniform_name: str, data):
 
 def interleave_vertex_data(verts, color, normal, distinct_colors=False,
                            distinct_normals=False):
-    data = []
+    buffersize = len(verts) * 3 + len(verts) * 4 + len(verts) * 3
+    data = np.zeros(buffersize, dtype=GLfloat)
     for i, vertex in enumerate(verts):
-        data.extend(vertex)
+        iv = i * (3 + 4 + 3)
+        data[iv:iv + 3] = vertex
         if distinct_colors:
-            data.extend(color[i])
+            data[iv + 3:iv + 7] = color[i]
         else:
-            data.extend(color)
+            data[iv + 3:iv + 7] = color
         if distinct_normals:
-            data.extend(normal[i])
+            data[iv + 7:iv + 10] = normal[i]
         else:
-            data.extend(normal)
+            data[iv + 7:iv + 10] = normal
 
     return data
 
@@ -110,6 +113,7 @@ def create_buffers(create_ebo=True):
     return vao, vbo, ebo
 
 def fill_buffer(buffer, data, kind) -> None:
+    #print(type(data), data[:10], len(data))
     gl_array = get_gl_array(data)
     glBindBuffer(kind, buffer)
     glBufferData(kind, ctypes.sizeof(gl_array), gl_array, GL_STATIC_DRAW)

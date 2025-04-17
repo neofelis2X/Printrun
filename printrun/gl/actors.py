@@ -41,7 +41,7 @@ from printrun.utils import install_locale
 install_locale("pronterface")
 
 # for type hints
-from typing import Union, Any, Tuple, List, Iterator
+from typing import Union, Any, Tuple, List, Iterator, Optional
 from printrun import stltool
 from printrun import gcoder
 Build_Dims = Tuple[int, int, int, int, int, int]
@@ -115,11 +115,11 @@ class ActorBaseClass(ABC):
         return self._modelmatrix
 
     @abstractmethod
-    def load(self):
+    def load(self) -> None:
         ...
 
     @abstractmethod
-    def draw(self):
+    def draw(self) -> None:
         ...
 
 
@@ -151,7 +151,7 @@ class Platform(ActorBaseClass):
         self.color_major = (*self.COLOR_DARK, 0.33)
 
         self.vertices = ()
-        self.indices = ()
+        self.indices = []
         self.color = ()
         self._initialise_data()
 
@@ -426,7 +426,7 @@ class Focus(ActorBaseClass):
         super().__init__()
         self.camera = cam
         self.vertices = ()
-        self.indices = ()
+        self.indices = []
         self.color = (15 / 255, 15 / 255, 15 / 255, 0.6)  # Black Transparent
         self.is_initialised = False
 
@@ -435,7 +435,7 @@ class Focus(ActorBaseClass):
 
         self.is_initialised = True
         self.update_size()
-        self.indices = (0, 1, 1, 2, 2, 3, 3, 0)
+        self.indices = [0, 1, 1, 2, 2, 3, 3, 0]
         renderer.fill_buffer(self.ebo, self.indices, GL_ELEMENT_ARRAY_BUFFER)
 
     def update_size(self) -> None:
@@ -491,7 +491,7 @@ class CuttingPlane(ActorBaseClass):
         self.plane_height = 0.0
 
         self.vertices = ()
-        self.indices = ()
+        self.indices = []
         self.color = (0 / 255, 229 / 255, 38 / 255, 0.3)  # Light Green
         self.color_outline = (0 / 255, 204 / 255, 38 / 255, 1.0)  # Green
 
@@ -510,8 +510,8 @@ class CuttingPlane(ActorBaseClass):
     def load(self):
         self.vao, self.vbo, self.ebo = renderer.create_buffers()
 
-        self.indices = (0, 1, 2, 3, 0, 2,  # plane
-                        6, 5, 5, 4, 4, 7, 7, 6)  # outline
+        self.indices = [0, 1, 2, 3, 0, 2,  # plane
+                        6, 5, 5, 4, 4, 7, 7, 6]  # outline
         renderer.fill_buffer(self.ebo, self.indices, GL_ELEMENT_ARRAY_BUFFER)
 
     def update_plane(self, axis: str, cutting_direction: int) -> None:
@@ -610,8 +610,8 @@ class MeshModel(ActorBaseClass):
         renderer.fill_buffer(self.vbo, vb, GL_ARRAY_BUFFER)
 
         # TODO: This is pointless, create proper indices for meshes
-        self.indices = range(len(vb) // 10)
-        renderer.fill_buffer(self.ebo, self.indices, GL_ELEMENT_ARRAY_BUFFER)
+        self.indices = np.arange(len(vb) // 10, dtype=GLuint)
+        renderer.fill_buffer(self.ebo, self.indices.data, GL_ELEMENT_ARRAY_BUFFER)
 
     def draw(self) -> None:
         glBindVertexArray(self.vao)
@@ -644,16 +644,29 @@ class Model(ActorBaseClass):
 
     axis_letter_map = {(v, k) for k, v in letter_axis_map.items()}
 
+    lock = threading.Lock()
+
     def __init__(self, offset_x: float = 0.0, offset_y: float = 0.0) -> None:
+        super().__init__()
         self.offset_x = offset_x
         self.offset_y = offset_y
         self._bounding_box = None
-
-        self.lock = threading.Lock()
-
-        self.init_model_attributes()
+        self.gcode: Optional[gcoder.GCode] = None
+        self.shader = None
 
         self.vertices = np.zeros(0, dtype = GLfloat)
+        self.colors = np.zeros(0, dtype = GLfloat)
+        self.layers_loaded = 0
+        self.initialized = False
+        self.max_layers = 0
+        self.num_layers_to_draw = 0
+        self.dims = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        self.layer_idxs_map = {}
+        self.layer_stops = [0]
+        self.printed_until = -1
+        self.only_current = False
+
+        self.init_model_attributes()
 
     def init_model_attributes(self) -> None:
         """
@@ -673,6 +686,16 @@ class Model(ActorBaseClass):
         if self._bounding_box is None:
             self._bounding_box = self._calculate_bounding_box()
         return self._bounding_box
+
+    def update(self, modelwrapper):
+        model = modelwrapper
+        tm = mat4_translation(*model.offsets)
+        rm = mat4_rotation(0.0, 0.0, 1.0, model.rot)
+        tc = mat4_translation(*model.centeroffset)
+        sm = mat4_scaling(*model.scale)
+        mat = sm.T @ tc.T @ rm.T @ tm.T
+
+        self._modelmatrix = mat.T.copy()
 
     def _calculate_bounding_box(self) -> BoundingBox:
         """
@@ -790,6 +813,8 @@ class GcodeModel(Model):
     color_printed = (0.2, 0.75, 0.0, 1.0)
     color_current = (0.0, 0.9, 1.0, 1.0)
     color_current_printed = (0.1, 0.4, 0, 1.0)
+    color_current_travel =  (0.8, 0.0, 1.0, 0.6)
+    # TODO: Add this color to settings
 
     display_travels = True
 
@@ -799,6 +824,17 @@ class GcodeModel(Model):
 
     path_halfwidth = 0.2
     path_halfheight = 0.2
+
+    def __init__(self):
+        super().__init__()
+        self.count_travel_indices = [0]
+        self.count_print_indices = [0]
+        self.count_print_vertices = [0]
+
+        self.normals = np.zeros(0, dtype = GLfloat)
+        self.indices = np.zeros(0, dtype = GLuint)
+        self.travels = np.zeros(0, dtype = GLfloat)
+        self.travels_offset = 0
 
     def set_path_size(self, path_halfwidth: float, path_halfheight: float) -> None:
         with self.lock:
@@ -1176,21 +1212,21 @@ class GcodeModel(Model):
                 #self.vertex_color_buffer.delete()
                 #self.vertex_normal_buffer.delete()
                 return
-            self.vao, self.vbo, self.ebo = renderer.create_buffers()
 
+            self.vao, self.vbo, self.ebo = renderer.create_buffers()
             vb = renderer.interleave_vertex_data(self.vertices.reshape(-1, 3),
                                                  self.colors.reshape(-1, 4),
                                                  self.normals.reshape(-1, 3),
                                                  distinct_colors=True,
                                                  distinct_normals=True)
 
-            # TODO: Can this all go into one buffer? Would be more elegant.
-            self.vao_travels, self.vbo_travels, _ = renderer.create_buffers(create_ebo=False)
             vb_travels = renderer.interleave_vertex_data(self.travels.reshape(-1, 3),
                                                          self.color_travel,
                                                          (0.0, 0.0, 1.0))
-            renderer.fill_buffer(self.vbo, vb, GL_ARRAY_BUFFER)
-            renderer.fill_buffer(self.vbo_travels, vb_travels, GL_ARRAY_BUFFER)
+            self.travels_offset = vb.size // 10
+            vb_all = np.concatenate((vb, vb_travels))
+
+            renderer.fill_buffer(self.vbo, vb_all, GL_ARRAY_BUFFER)
             renderer.fill_buffer(self.ebo, self.indices.data, GL_ELEMENT_ARRAY_BUFFER)
 
             if self.fully_loaded:
@@ -1202,7 +1238,8 @@ class GcodeModel(Model):
                 self.normals = np.zeros(0, dtype = GLfloat)
             self.buffers_created = True
 
-    def draw(self, mode_2d: bool = False) -> None:
+    def draw(self) -> None:
+        glBindVertexArray(self.vao)
         with self.lock:
 
             if self.display_travels:
@@ -1211,21 +1248,29 @@ class GcodeModel(Model):
             self._display_movements()
 
     def _display_travels(self) -> None:
-        glBindVertexArray(self.vao_travels)
-
         # Prevent race condition by using the number of currently loaded layers
         max_layers = self.layers_loaded
-
-        # TODO: show current layer travels in a different color
         end = self.layer_stops[min(self.num_layers_to_draw, max_layers)]
         end_index = self.count_travel_indices[end]
-        if self.only_current:
-            if self.num_layers_to_draw < max_layers:
-                end_prev_layer = self.layer_stops[self.num_layers_to_draw - 1]
-                start_index = self.count_travel_indices[end_prev_layer + 1]
-                glDrawArrays(GL_LINES, start_index, end_index - start_index + 1)
-        else:
-            glDrawArrays(GL_LINES, 0, end_index)
+
+        # Draw current layer travels
+        if self.num_layers_to_draw < max_layers:
+            end_prev_layer = self.layer_stops[self.num_layers_to_draw - 1]
+            start_index = self.count_travel_indices[end_prev_layer + 1]
+
+            renderer.load_uniform(self.shader.id, "doOverwriteColor", 1)
+            renderer.load_uniform(self.shader.id, "oColor",
+                                  self.color_current_travel)
+
+            glDrawArrays(GL_LINES, self.travels_offset + start_index,
+                         end_index - start_index + 1)
+
+            renderer.load_uniform(self.shader.id, "doOverwriteColor", 0)
+            end_index = start_index
+
+        # Draw all other visible travels
+        if not self.only_current:
+            glDrawArrays(GL_LINES, self.travels_offset, end_index - 1)
 
     def _draw_elements(self, start: int, end: int, draw_type = GL_TRIANGLES) -> None:
         # Don't attempt printing empty layer
@@ -1239,7 +1284,6 @@ class GcodeModel(Model):
                             sizeof(GLuint) * self.count_print_indices[start - 1])
 
     def _display_movements(self) -> None:
-        glBindVertexArray(self.vao)
         # Prevent race condition by using the number of currently loaded layers
         max_layers = self.layers_loaded
 
@@ -1311,7 +1355,8 @@ class GcodeModelLight(Model):
     loaded = False
     fully_loaded = False
 
-    gcode = None
+    def __init__(self):
+        super().__init__()
 
     def load_data(self, model_data: gcoder.GCode,
                   callback = None) -> Iterator[Union[int, None]]:
@@ -1459,12 +1504,12 @@ class GcodeModelLight(Model):
 
             self.buffers_created = True
 
-    def draw(self, mode_2d: bool = False) -> None:
+    def draw(self) -> None:
         glBindVertexArray(self.vao)
         with self.lock:
-            self._display_movements(mode_2d)
+            self._display_movements()
 
-    def _display_movements(self, mode_2d: bool = False) -> None:
+    def _display_movements(self) -> None:
         # Prevent race condition by using the number of currently loaded layers
         max_layers = self.layers_loaded
 
@@ -1524,7 +1569,4 @@ class GcodeModelLight(Model):
         end = end - start
         if end_prev_layer < 0 < end and not self.only_current:
             glDrawArrays(GL_LINES, start, end)
-
-        #self.vertex_buffer.unbind()
-        #self.vertex_color_buffer.unbind()
 
