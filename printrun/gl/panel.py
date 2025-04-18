@@ -104,17 +104,21 @@ class wxGLPanel(BASE_CLASS):
             self.canvas: glcanvas.GLCanvas = self  # type: ignore
         else:
             super().__init__(parent, wx.ID_ANY, pos, size, style)
-            self.canvas = glcanvas.GLCanvas(self, attribList, wx.ID_ANY, pos, size, style)
+            self.canvas = glcanvas.GLCanvas(self, attribList, wx.ID_ANY,
+                                            pos, size, style)
 
         self.width = 1.0
         self.height = 1.0
 
         self.shader = {}
-        self.camera = camera.Camera(self, build_dimensions, ortho = not perspective)
+        self.camera = camera.Camera(self, build_dimensions,
+                                    ortho = not perspective)
         self.focus = actors.Focus(self.camera)
-        self.platform = actors.Platform(build_dimensions, circular = circular, grid = grid)
+        self.platform = actors.Platform(build_dimensions, circular = circular,
+                                        grid = grid)
         self.keyinput = kbi.KeyboardInput(self.canvas, self.zoom_to_center,
-                                      self.fit, self.resetview)
+                                          self.fit, self.resetview,
+                                          self.reload_shader)
 
         if self.show_frametime:
             self.init_frametime()
@@ -202,7 +206,7 @@ class wxGLPanel(BASE_CLASS):
                 if not self.GLinitialized:
                     self.OnInitGL()
                 self.DrawCanvas()
-            except pyglet.gl.GLException:
+            except gl.GLException:
                 self.gl_broken = True
                 logging.error(_("GL: OpenGL failed, disabling it:")
                               + "\n" + traceback.format_exc())
@@ -254,12 +258,15 @@ class wxGLPanel(BASE_CLASS):
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         glEnable(GL_LINE_SMOOTH)
 
-        sh = renderer.load_shader()
-        self.shader["basic"] = sh
+        shader = renderer.load_shader()
+        if not shader:
+            logging.error("Error happened loading the OpenGL shader.")
+            self.gl_broken = True
+            return
+
+        self.shader["basic"] = shader
         self.focus.load()
         self.platform.load()
-        #self._setup_lights()
-        #self._setup_material()
 
         if call_reshape:
             self.OnReshape()
@@ -307,6 +314,22 @@ class wxGLPanel(BASE_CLASS):
     def resetview(self) -> None:
         self.set_current_context()
         self.camera.reset_view_matrix()
+        wx.CallAfter(self.Refresh)
+
+    def reload_shader(self) -> None:
+        if not self.show_frametime:
+            return
+
+        new_shader = renderer.load_shader()
+        if not new_shader:
+            return
+
+        new_shader.use()
+        old_shader = self.shader["basic"]
+        self.shader["basic"] = new_shader
+        old_shader.delete()
+        logging.info("OpenGL shader has been reloaded.")
+        print("OpenGL shader has been reloaded.")
         wx.CallAfter(self.Refresh)
 
     def recreate_platform(self, build_dimensions: Build_Dims,
