@@ -50,9 +50,9 @@ class Camera():
         self.dist = 1.0
         self.update_build_dims(build_dimensions, setview=False)
 
-        self.eye = np.array((0.0, 0.0, 1.0))
-        self.target = np.array((0.0, 0.0, 0.0))
-        self.up = np.array((0.0, 1.0, 0.0))
+        self._eye = np.array((0.0, 0.0, 1.0))
+        self._target = np.array((0.0, 0.0, 0.0))
+        self._up = np.array((0.0, 1.0, 0.0))
         self.x_axis = np.array((-1.0, 0.0, 0.0))
         self.dolly_factor = 1.0
 
@@ -61,6 +61,10 @@ class Camera():
         self._view_mat = np.identity(4, dtype=np.float32)
         self._proj_mat = np.identity(4, dtype=np.float32)
         self._ortho2d_mat = np.identity(4, dtype=np.float32)
+
+    @property
+    def eye(self) -> np.ndarray:
+        return self._eye
 
     @property
     def view(self) -> np.ndarray:
@@ -97,17 +101,17 @@ class Camera():
             self._set_initial_view()
 
     def _set_initial_view(self) -> None:
-        self.eye = np.array((-self.platformcenter[0],
+        self._eye = np.array((-self.platformcenter[0],
                              -self.platformcenter[1],
                              self.dist * 1.5))
 
-        self.target = np.array((-self.platformcenter[0],
+        self._target = np.array((-self.platformcenter[0],
                                 -self.platformcenter[1],
                                 0.0))
         self._rebuild_view_mat()
 
     def reset_view_matrix(self) -> None:
-        self.up = np.array((0.0, 1.0, 0.0))
+        self._up = np.array((0.0, 1.0, 0.0))
         self.x_axis = np.array((-1.0, 0.0, 0.0))
         self._set_initial_view()
 
@@ -153,8 +157,8 @@ class Camera():
         """
         delta = np.array((x, y, z))
 
-        self.eye = delta + self.eye
-        self.target = delta + self.target
+        self._eye = delta + self._eye
+        self._target = delta + self._target
 
         self._rebuild_view_mat()
 
@@ -212,16 +216,16 @@ class Camera():
                 center_vec = np.array(self.canvas.mouse_to_3d(self.width / 2,
                                                               self.height / 2))
                 dolly_delta =(cursor_vec - center_vec) * (1.0 - 1 / factor)
-                self.eye = dolly_delta + self.eye
-                self.target = dolly_delta + self.target
+                self._eye = dolly_delta + self._eye
+                self._target = dolly_delta + self._target
         else:
             if to_cursor:
                 cursor_vec = np.array(self.canvas.mouse_to_3d(to_cursor[0],
                                                               to_cursor[1]))
-                cursor_dir = self.eye - cursor_vec
+                cursor_dir = self._eye - cursor_vec
                 cursor_udir = cursor_dir / vec_length(cursor_dir)
 
-                forward = self.target - self.eye
+                forward = self._target - self._eye
                 length = vec_length(forward)
                 uforward = forward / length
 
@@ -232,24 +236,24 @@ class Camera():
                     (new_length > 5 * self.dist or new_length < 6.0):
                     return
 
-                self.eye = self.eye + delta_vec
-                self.target = self.eye + uforward * new_length
-                if self.target[2] < 0.0:
+                self._eye = self._eye + delta_vec
+                self._target = self._eye + uforward * new_length
+                if self._target[2] < 0.0:
                     # We don't want the pivot to go lower than the platform
-                    self.target = self._set_target_to_ground(self.target,
-                                                             self.eye,
+                    self._target = self._set_target_to_ground(self._target,
+                                                             self._eye,
                                                              uforward)
 
             else:
-                eye = self.target + (self.eye - self.target) * 1 / factor
-                forward = eye - self.target
+                eye = self._target + (self._eye - self._target) * 1 / factor
+                forward = eye - self._target
                 new_length = vec_length(forward)
 
                 if limit_zoom and \
                     (new_length > 5 * self.dist or new_length < 6.0):
                     return
 
-                self.eye = eye
+                self._eye = eye
 
         if rebuild_mat:
             self._rebuild_view_mat()
@@ -300,11 +304,11 @@ class Camera():
                     # TODO: Is trackball still useable?
                     delta_quat = trackball(p1x, p1y, p2x, p2y, self.dist / 250.0)
 
-            forward = self.eye - self.target
-            rotated_forward, self.up, self.x_axis, *_ = quat_rotate_vec(delta_quat,
-                                                        [forward, self.up, self.x_axis])
+            forward = self._eye - self._target
+            rotated_forward, self._up, self.x_axis, *_ = quat_rotate_vec(delta_quat,
+                                                        [forward, self._up, self.x_axis])
 
-            self.eye = rotated_forward + self.target
+            self._eye = rotated_forward + self._target
             self._rebuild_view_mat()
             self.init_rot_pos = p2
 
@@ -324,8 +328,8 @@ class Camera():
                 df = self._current_dolly_factor()
                 delta = (vec1 - vec2) * df
 
-            self.eye = delta + self.eye
-            self.target = delta + self.target
+            self._eye = delta + self._eye
+            self._target = delta + self._target
 
             self._rebuild_view_mat()
             self.init_trans_pos = p2
@@ -335,14 +339,14 @@ class Camera():
         Returns a factor of the current dolly distance relativ to
         the max. dolly distance.
         """
-        forward = self.eye - self.target
+        forward = self._eye - self._target
         dolly_dist = vec_length(forward)
         dolly_limits = 5 * self.dist - 6.0
 
         return dolly_dist / dolly_limits
 
     def _rebuild_view_mat(self) -> None:
-        self._view_mat = self._look_at(self.eye , self.target, self.up)
+        self._view_mat = self._look_at(self._eye , self._target, self._up)
 
     def _look_at(self, eye: np.ndarray,
                        center: np.ndarray,
