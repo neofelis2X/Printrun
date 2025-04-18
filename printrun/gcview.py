@@ -115,6 +115,11 @@ class GcodeViewPanel(wxGLPanel):
             getattr(self.parent, 'loadcb', bool)()
             self.parent.filenames = None
 
+    def reload_shader(self):
+        super().reload_shader()
+        for obj in self.parent.objects:
+            obj.model.shader = self.shader["basic"]
+
     def create_objects(self) -> None:
         '''create opengl objects when opengl is initialized'''
         for obj in self.parent.objects:
