@@ -111,7 +111,7 @@ class ActorBaseClass(ABC):
         self._modelmatrix = np.identity(4, dtype=np.float32)
 
     @property
-    def modelmatrix(self):
+    def modelmatrix(self) -> np.ndarray:
         return self._modelmatrix
 
     @abstractmethod
@@ -184,7 +184,7 @@ class Platform(ActorBaseClass):
             return ()
         return self.color_minor
 
-    def _initialise_data(self):
+    def _initialise_data(self) -> None:
         self._modelmatrix = mat4_translation(self.xoffset,
                                              self.yoffset,
                                              self.zoffset)

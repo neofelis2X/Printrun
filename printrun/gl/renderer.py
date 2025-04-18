@@ -30,10 +30,24 @@ def load_shader():
     vert_source = Path("printrun/assets/shader/basic.vert.glsl")
     frag_source = Path("printrun/assets/shader/basic.frag.glsl")
 
-    vert_shader = shader.Shader(vert_source.read_text(encoding="utf-8"), 'vertex')
-    frag_shader = shader.Shader(frag_source.read_text(encoding="utf-8"), 'fragment')
+    try:
+        vert_shader = shader.Shader(vert_source.read_text(encoding="utf-8"),
+                                    'vertex')
+    except shader.ShaderException as e:
+        print("Error in vertex shader:", e)
+        return None
+    try:
+        frag_shader = shader.Shader(frag_source.read_text(encoding="utf-8"),
+                                    'fragment')
+    except shader.ShaderException as e:
+        print("Error in fragment shader:",e)
+        return None
 
-    shader_program = shader.ShaderProgram(vert_shader, frag_shader)
+    try:
+        shader_program = shader.ShaderProgram(vert_shader, frag_shader)
+    except shader.ShaderException as e:
+        print("Error creating the shader program:",e)
+        return None
 
     vert_shader.delete()
     frag_shader.delete()

@@ -28,11 +28,13 @@ KEYS = {'zoom_in': (wx.WXK_PAGEDOWN, wx.WXK_RIGHT, ord('+'), ord('='), 388),
         'layerup': (ord('U'), ord('E'), wx.WXK_UP),
         'layerdown': (ord('D'), wx.WXK_DOWN),
         'currentlayer': (ord('C'), ),
+        'reloadshader': (ord('N'), ),
        }
 
 class KeyboardInput():
     def __init__(self, canvas: 'wxGLPanel', zoom_fn: Callable,
-                 fit_fn: Callable, reset_fn: Callable) -> None:
+                 fit_fn: Callable, reset_fn: Callable, shader_fn: Callable
+                 ) -> None:
 
         self.canvas = canvas
         self.canvas.Bind(wx.EVT_KEY_DOWN, self.keypress)
@@ -41,6 +43,7 @@ class KeyboardInput():
         self.zoom = zoom_fn
         self.fit = fit_fn
         self.resetview = reset_fn
+        self.reload_shader = shader_fn
 
         # Optional featuress
         self.layer_up = self.dummy_fn
@@ -88,6 +91,9 @@ class KeyboardInput():
 
         elif keycode in KEYS['currentlayer']:
             self.current_layer()
+
+        elif keycode in KEYS['reloadshader']:
+            self.reload_shader()
 
         event.Skip()
         wx.CallAfter(self.canvas.Refresh)
