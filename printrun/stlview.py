@@ -278,7 +278,7 @@ def main() -> None:
     modeldata.centeroffset = [-(modeldata.dims[1] + modeldata.dims[0]) / 2,
                               -(modeldata.dims[3] + modeldata.dims[2]) / 2,
                               0.0]
-    modeldata.scale = [1.0, 1.0, 0.6]
+    modeldata.scale = [1.0, 1.0, 1.0]
     modeldata.batch = actors.MeshModel(modeldata)
 
     frame.models = {'example': modeldata}

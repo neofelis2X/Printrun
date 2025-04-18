@@ -24,7 +24,8 @@ from pyglet.gl import GLfloat, GLuint, \
                       glGenVertexArrays, glBindVertexArray, glGenBuffers, \
                       glBindBuffer, glBufferData, glEnableVertexAttribArray, \
                       glVertexAttribPointer, glGetUniformLocation, \
-                      glUniformMatrix4fv, glUniform1i, glUniform4f
+                      glUniformMatrix4fv, glUniform1i, glUniform4f, \
+                      glUniform3f
 
 def load_shader():
     vert_source = Path("printrun/assets/shader/basic.vert.glsl")
@@ -57,12 +58,24 @@ def load_shader():
 def load_mvp_uniform(shader_id, camera, actor):
     if actor.is_3d:
         mat = camera.projection @ camera.view @ actor.modelmatrix
+        modelmat = actor.modelmatrix
     else:
         mat = camera.projection2d
+        modelmat = np.identity(4, dtype=GLfloat)
+    view = camera.eye
 
     location = glGetUniformLocation(shader_id, b"modelViewProjection")
     ptr = mat.ctypes.data_as(ctypes.POINTER(GLfloat))
     glUniformMatrix4fv(location, 1, GL_TRUE, ptr)
+
+    location = glGetUniformLocation(shader_id, b"modelMat")
+    ptr = modelmat.ctypes.data_as(ctypes.POINTER(GLfloat))
+    glUniformMatrix4fv(location, 1, GL_TRUE, ptr)
+
+    location = glGetUniformLocation(shader_id, b"viewPos")
+    ptr = view.ctypes.data_as(ctypes.POINTER(GLfloat))
+    glUniform3f(location, *view.data)
+
 
 def load_uniform(shader_id, uniform_name: str, data):
     location = glGetUniformLocation(shader_id, uniform_name.encode())
