@@ -27,6 +27,10 @@ from pyglet.gl import GLfloat, GLuint, \
                       glUniformMatrix4fv, glUniform1i, glUniform4f, \
                       glUniform3f
 
+# for type hints
+from typing import Optional
+
+
 def load_shader():
     vert_source = Path("printrun/assets/shader/basic.vert.glsl")
     frag_source = Path("printrun/assets/shader/basic.frag.glsl")
@@ -83,29 +87,36 @@ def load_uniform(shader_id, uniform_name: str, data):
         print("Could not find Uniform location.")
         return
     if uniform_name == "doOverwriteColor":
-        glUniform1i(location, data)
+        glUniform1i(location, int(data))
     elif uniform_name == "oColor":
         glUniform4f(location, *data)
 
-def interleave_vertex_data(verts, color, normal, distinct_colors=False,
-                           distinct_normals=False):
-    buffersize = len(verts) * 3 + len(verts) * 4 + len(verts) * 3
+def interleave_vertex_data(verts, color, normal: Optional[np.ndarray]=None,
+                           distinct_colors=False, distinct_normals=False):
+    if isinstance(normal, np.ndarray) or normal:
+        element_count = 3 + 4 + 3
+    else:
+        element_count = 3 + 4
+
+    buffersize = len(verts) * element_count
     data = np.zeros(buffersize, dtype=GLfloat)
+
     for i, vertex in enumerate(verts):
-        iv = i * (3 + 4 + 3)
+        iv = i * element_count
         data[iv:iv + 3] = vertex
         if distinct_colors:
             data[iv + 3:iv + 7] = color[i]
         else:
             data[iv + 3:iv + 7] = color
-        if distinct_normals:
-            data[iv + 7:iv + 10] = normal[i]
-        else:
-            data[iv + 7:iv + 10] = normal
+        if isinstance(normal, np.ndarray) or normal:
+            if distinct_normals:
+                data[iv + 7:iv + 10] = normal[i]
+            else:
+                data[iv + 7:iv + 10] = normal
 
     return data
 
-def create_buffers(create_ebo=True):
+def create_buffers(create_ebo=True, lines_only=False):
     """
     Creates and sets up VAO, VBO and EBO.
     Returns handles to VAO, VBO, EBO.
@@ -120,14 +131,20 @@ def create_buffers(create_ebo=True):
     glGenBuffers(1, vbo)
     glBindBuffer(GL_ARRAY_BUFFER, vbo)
 
+    oc = 7 if lines_only else 10
+
     glEnableVertexAttribArray(0)  # Vertex position
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 10 * ctypes.sizeof(GLfloat), 0)
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE,
+                          oc * ctypes.sizeof(GLfloat), 0)
     glEnableVertexAttribArray(1)  # Vertex colour
-    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 10 * ctypes.sizeof(GLfloat),
+    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE,
+                          oc * ctypes.sizeof(GLfloat),
                           3 * ctypes.sizeof(GLfloat))
-    glEnableVertexAttribArray(2)  # Vertex normal direction
-    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 10 * ctypes.sizeof(GLfloat),
-                          7 * ctypes.sizeof(GLfloat))
+    if not lines_only:
+        glEnableVertexAttribArray(2)  # Vertex normal direction
+        glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE,
+                              oc * ctypes.sizeof(GLfloat),
+                              7 * ctypes.sizeof(GLfloat))
 
     if create_ebo:
         # Index buffer object

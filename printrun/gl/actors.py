@@ -194,13 +194,12 @@ class Platform(ActorBaseClass):
             self._load_rectangular()
 
     def _update_vbo(self):
-        normal = (0.0, 0.0, 0.1)
         vb = renderer.interleave_vertex_data(self.vertices, self.color,
-                                             normal, distinct_colors=True)
+                                             distinct_colors=True)
         renderer.fill_buffer(self.vbo, vb, GL_ARRAY_BUFFER)
 
     def load(self):
-        self.vao, self.vbo, self.ebo = renderer.create_buffers()
+        self.vao, self.vbo, self.ebo = renderer.create_buffers(lines_only=True)
         renderer.fill_buffer(self.ebo, self.indices, GL_ELEMENT_ARRAY_BUFFER)
         self._update_vbo()
 
@@ -360,7 +359,7 @@ class MouseCursor(ActorBaseClass):
 
     def load(self):
         self.vao, self.vbo, self.ebo = renderer.create_buffers()
-        normal = (0.0, 0.0, 1.0)
+        normal = np.array((0.0, 0.0, 1.0))
         vb = renderer.interleave_vertex_data(self.vertices, self.color, normal)
         renderer.fill_buffer(self.vbo, vb, GL_ARRAY_BUFFER)
         renderer.fill_buffer(self.ebo, self.indices, GL_ELEMENT_ARRAY_BUFFER)
@@ -431,7 +430,7 @@ class Focus(ActorBaseClass):
         self.is_initialised = False
 
     def load(self) -> None:
-        self.vao, self.vbo, self.ebo = renderer.create_buffers()
+        self.vao, self.vbo, self.ebo = renderer.create_buffers(lines_only=True)
 
         self.is_initialised = True
         self.update_size()
@@ -448,8 +447,7 @@ class Focus(ActorBaseClass):
                          (self.camera.width - offset, offset, 0.0),
                          (self.camera.width - offset, self.camera.height - offset, 0.0),
                          (offset, self.camera.height - offset, 0.0))
-        normal = (0.0, 0.0, 1.0)
-        vs = renderer.interleave_vertex_data(self.vertices, self.color, normal)
+        vs = renderer.interleave_vertex_data(self.vertices, self.color)
         renderer.fill_buffer(self.vbo, vs, GL_ARRAY_BUFFER)
 
     def update_colour(self, bg_color: Tuple[float, float, float]) -> None:
@@ -502,7 +500,7 @@ class CuttingPlane(ActorBaseClass):
                          (self.plane_width, 0.2, 0.0))
 
         colors = 4 * [self.color] + 4 * [self.color_outline]
-        normal = (0.0, 0.0, self.cutting_direction)
+        normal = np.array((0.0, 0.0, self.cutting_direction))
         vb = renderer.interleave_vertex_data(self.vertices, colors, normal,
                                              distinct_colors=True)
         renderer.fill_buffer(self.vbo, vb, GL_ARRAY_BUFFER)
@@ -592,25 +590,21 @@ class MeshModel(ActorBaseClass):
     def _initialise_data(self) -> None:
         # Create the vertex and normal arrays.
         # TODO: The whole data pipeline here can surely be optimised.
-        vertices = []
-        normals = []
+        stride = 3 + 4 + 3
+        vb = np.zeros(len(self.meshdata.facets) * 3 * stride, dtype=GLfloat)
 
-        for facet in self.meshdata.facets:
-            for vertex in facet[1]:
-                if isinstance(vertex, list):
-                    # FIXME: binary stls are loaded differently -> fix stltool.stl
-                    vertices.append(vertex)
-                    normals.append(facet[0])
-                else:
-                    vertices.append(vertex.tolist())
-                    normals.append(facet[0].tolist())
+        for i, facet in enumerate(self.meshdata.facets):
+            iv = i * 3 * stride
+            for j, vertex in enumerate(facet[1]):
+                jv = iv + j * stride
+                vb[jv:jv + 3] = vertex
+                vb[jv + 3:jv + 7] = self.color
+                vb[jv + 7:jv + 10] = facet[0]
 
-        vb = renderer.interleave_vertex_data(vertices, self.color, normals,
-                                             distinct_normals=True)
         renderer.fill_buffer(self.vbo, vb, GL_ARRAY_BUFFER)
 
         # TODO: This is pointless, create proper indices for meshes
-        self.indices = np.arange(len(vb) // 10, dtype=GLuint)
+        self.indices = np.arange(vb.size // 10, dtype=GLuint)
         renderer.fill_buffer(self.ebo, self.indices.data, GL_ELEMENT_ARRAY_BUFFER)
 
     def draw(self) -> None:
@@ -1220,9 +1214,10 @@ class GcodeModel(Model):
                                                  distinct_colors=True,
                                                  distinct_normals=True)
 
+            normal = np.array((0.0, 0.0, 1.0))
             vb_travels = renderer.interleave_vertex_data(self.travels.reshape(-1, 3),
                                                          self.color_travel,
-                                                         (0.0, 0.0, 1.0))
+                                                         normal)
             self.travels_offset = vb.size // 10
             vb_all = np.concatenate((vb, vb_travels))
 
@@ -1258,14 +1253,14 @@ class GcodeModel(Model):
             end_prev_layer = self.layer_stops[self.num_layers_to_draw - 1]
             start_index = self.count_travel_indices[end_prev_layer + 1]
 
-            renderer.load_uniform(self.shader.id, "doOverwriteColor", 1)
+            renderer.load_uniform(self.shader.id, "doOverwriteColor", True)
             renderer.load_uniform(self.shader.id, "oColor",
                                   self.color_current_travel)
 
             glDrawArrays(GL_LINES, self.travels_offset + start_index,
                          end_index - start_index + 1)
 
-            renderer.load_uniform(self.shader.id, "doOverwriteColor", 0)
+            renderer.load_uniform(self.shader.id, "doOverwriteColor", False)
             end_index = start_index
 
         # Draw all other visible travels
@@ -1295,7 +1290,7 @@ class GcodeModel(Model):
             end_prev_layer = 0
         end = self.layer_stops[min(self.num_layers_to_draw, max_layers)]
 
-        renderer.load_uniform(self.shader.id, "doOverwriteColor", 1)
+        renderer.load_uniform(self.shader.id, "doOverwriteColor", True)
         renderer.load_uniform(self.shader.id, "oColor", self.color_printed)
 
         # Draw printed stuff until end or end_prev_layer
@@ -1306,7 +1301,7 @@ class GcodeModel(Model):
             elif cur_end >= 1:
                 self._draw_elements(1, cur_end)
 
-        renderer.load_uniform(self.shader.id, "doOverwriteColor", 0)
+        renderer.load_uniform(self.shader.id, "doOverwriteColor", False)
 
         # Draw nonprinted stuff until end_prev_layer
         start = max(cur_end, 1)
@@ -1317,7 +1312,7 @@ class GcodeModel(Model):
 
         # Draw current layer
         if layer_selected:
-            renderer.load_uniform(self.shader.id, "doOverwriteColor", 1)
+            renderer.load_uniform(self.shader.id, "doOverwriteColor", True)
             renderer.load_uniform(self.shader.id, "oColor", self.color_current_printed)
 
             if cur_end > end_prev_layer:
@@ -1328,7 +1323,7 @@ class GcodeModel(Model):
             if end > cur_end:
                 self._draw_elements(cur_end + 1, end)
 
-            renderer.load_uniform(self.shader.id, "doOverwriteColor", 0)
+            renderer.load_uniform(self.shader.id, "doOverwriteColor", False)
 
         # Draw non printed stuff until end (if not ending at a given layer)
         start = max(self.printed_until, 1)
@@ -1489,11 +1484,10 @@ class GcodeModelLight(Model):
                 return
 
             # TODO: Indexed data would be nice to have?
-            self.vao, self.vbo, _ = renderer.create_buffers(create_ebo=False)
-            normal = (0.0, 0.0, 1.0)
+            self.vao, self.vbo, _ = renderer.create_buffers(create_ebo=False,
+                                                            lines_only=True)
             vb = renderer.interleave_vertex_data(self.vertices.reshape(-1, 3),
                                                  self.colors.reshape(-1, 4),
-                                                 normal,
                                                  distinct_colors=True)
             renderer.fill_buffer(self.vbo, vb, GL_ARRAY_BUFFER)
 
@@ -1520,7 +1514,7 @@ class GcodeModelLight(Model):
             end_prev_layer = -1
         end = self.layer_stops[min(self.num_layers_to_draw, max_layers)]
 
-        renderer.load_uniform(self.shader.id, "doOverwriteColor", 1)
+        renderer.load_uniform(self.shader.id, "doOverwriteColor", True)
         renderer.load_uniform(self.shader.id, "oColor", self.color_printed)
 
         # Draw printed stuff until end or end_prev_layer
@@ -1531,7 +1525,7 @@ class GcodeModelLight(Model):
             elif cur_end >= 0:
                 glDrawArrays(GL_LINES, start, cur_end)
 
-        renderer.load_uniform(self.shader.id, "doOverwriteColor", 0)
+        renderer.load_uniform(self.shader.id, "doOverwriteColor", False)
 
         # Draw nonprinted stuff until end_prev_layer
         start = max(cur_end, 0)
@@ -1547,7 +1541,7 @@ class GcodeModelLight(Model):
             #glGetFloatv(GL_LINE_WIDTH, orig_linewidth)
             #glLineWidth(2.0)
 
-            renderer.load_uniform(self.shader.id, "doOverwriteColor", 1)
+            renderer.load_uniform(self.shader.id, "doOverwriteColor", True)
             renderer.load_uniform(self.shader.id, "oColor",
                                   self.color_current_printed)
 
@@ -1560,7 +1554,7 @@ class GcodeModelLight(Model):
             if end > cur_end:
                 glDrawArrays(GL_LINES, cur_end, end - cur_end)
 
-            renderer.load_uniform(self.shader.id, "doOverwriteColor", 0)
+            renderer.load_uniform(self.shader.id, "doOverwriteColor", False)
             # Restore line width
             #glLineWidth(orig_linewidth)
 
