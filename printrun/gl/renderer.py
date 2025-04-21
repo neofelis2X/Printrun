@@ -13,6 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with Printrun.  If not, see <http://www.gnu.org/licenses/>.
 
+import logging
 from pathlib import Path
 import ctypes
 import numpy as np
@@ -28,36 +29,83 @@ from pyglet.gl import GLfloat, GLuint, \
                       glUniform3f
 
 # for type hints
-from typing import Optional
+from typing import Optional, Dict, List
+
+SRC_VERT_BASIC = Path("printrun/assets/shader/basic.vert.glsl")
+SRC_FRAG_BASIC = Path("printrun/assets/shader/basic.frag.glsl")
+SRC_VERT_LINES = Path("printrun/assets/shader/lines.vert.glsl")
+SRC_GEOM_LINES = Path("printrun/assets/shader/lines.geom.glsl")
+SRC_FRAG_LINES = Path("printrun/assets/shader/lines.frag.glsl")
 
 
-def load_shader():
-    vert_source = Path("printrun/assets/shader/basic.vert.glsl")
-    frag_source = Path("printrun/assets/shader/basic.frag.glsl")
-
-    try:
-        vert_shader = shader.Shader(vert_source.read_text(encoding="utf-8"),
-                                    'vertex')
-    except shader.ShaderException as e:
-        print("Error in vertex shader:", e)
-        return None
-    try:
-        frag_shader = shader.Shader(frag_source.read_text(encoding="utf-8"),
-                                    'fragment')
-    except shader.ShaderException as e:
-        print("Error in fragment shader:",e)
+def load_shader() -> Optional[Dict[str, shader.ShaderProgram]]:
+    shs = _compile_shaders(SRC_VERT_BASIC, SRC_FRAG_BASIC)
+    if shs:
+        vert_sh, frag_sh = shs[0], shs[1]
+    else:
         return None
 
     try:
-        shader_program = shader.ShaderProgram(vert_shader, frag_shader)
+        basic_program = shader.ShaderProgram(vert_sh, frag_sh)
     except shader.ShaderException as e:
-        print("Error creating the shader program:",e)
+        logging.error("Error creating the 'basic' shader program: %s" % e)
         return None
 
-    vert_shader.delete()
-    frag_shader.delete()
+    logging.debug("Successfully created the 'basic' shader program.")
+    vert_sh.delete()
+    frag_sh.delete()
 
-    return shader_program
+    shs = _compile_shaders(SRC_VERT_LINES, SRC_FRAG_LINES, SRC_GEOM_LINES)
+    if shs:
+        vert_sh, frag_sh, geom_sh = shs[0], shs[1], shs[2]
+    else:
+        return None
+
+    try:
+        lines_program = shader.ShaderProgram(vert_sh, frag_sh, geom_sh)
+    except shader.ShaderException as e:
+        logging.error("Error creating the 'lines' shader program:%s" % e)
+        return None
+
+    logging.debug("Successfully created the 'lines' shader program.")
+    vert_sh.delete()
+    frag_sh.delete()
+    geom_sh.delete()
+
+    return {"basic": basic_program, "lines": lines_program}
+
+def _compile_shaders(vert_src: Path, frag_src: Path,
+                    geom_src: Optional[Path]=None
+                     ) -> Optional[List[shader.Shader]]:
+
+    new_shaders = []
+    vert_shader = _compile_shader(vert_src, "vertex")
+    new_shaders.append(vert_shader)
+    frag_shader = _compile_shader(frag_src, "fragment")
+    new_shaders.append(frag_shader)
+
+    if geom_src:
+        geom_shader = _compile_shader(geom_src, "geometry")
+        new_shaders.append(geom_shader)
+
+    for sh in new_shaders:
+        if not sh:
+            return None
+
+    return new_shaders
+
+def _compile_shader(src: Path, kind: shader.ShaderType) -> Optional[shader.Shader]:
+    if not src.is_file():
+        logging.error("Source file for %s shader is not available." % src.name)
+        return None
+
+    try:
+        new_shader = shader.Shader(src.read_text(encoding="utf-8"), kind)
+    except shader.ShaderException as e:
+        logging.error("Error in %s shader:%s" % (kind, e))
+        return None
+
+    return new_shader
 
 def load_mvp_uniform(shader_id, camera, actor):
     if actor.is_3d:
@@ -84,7 +132,7 @@ def load_mvp_uniform(shader_id, camera, actor):
 def load_uniform(shader_id, uniform_name: str, data):
     location = glGetUniformLocation(shader_id, uniform_name.encode())
     if location == -1:
-        print("Could not find Uniform location.")
+        logging.warning("Could not find Uniform location.")
         return
     if uniform_name == "doOverwriteColor":
         glUniform1i(location, int(data))
