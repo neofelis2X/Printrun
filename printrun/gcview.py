@@ -115,17 +115,12 @@ class GcodeViewPanel(wxGLPanel):
             getattr(self.parent, 'loadcb', bool)()
             self.parent.filenames = None
 
-    def reload_shader(self):
-        super().reload_shader()
-        for obj in self.parent.objects:
-            obj.model.shader = self.shader["basic"]
-
     def create_objects(self) -> None:
         '''create opengl objects when opengl is initialized'''
         for obj in self.parent.objects:
             if obj.model and obj.model.loaded and not obj.model.initialized:
                 self.set_current_context()
-                obj.model.load(self.shader["basic"])
+                obj.model.load(self.shader)
 
     def draw_objects(self) -> None:
         '''called in the middle of ondraw after the buffer has been cleared'''
@@ -142,8 +137,13 @@ class GcodeViewPanel(wxGLPanel):
             # if not model.initialized:
             #     continue
 
+            if isinstance(model, actors.GcodeModelLight):
+                sh = "lines"
+            else:
+                sh = "basic"
             model.update(obj)
-            renderer.load_mvp_uniform(self.shader["basic"].id, self.camera, model)
+            self.shader[sh].use()
+            renderer.load_mvp_uniform(self.shader[sh].id, self.camera, model)
             model.draw()
 
     # ==========================================================================
@@ -211,9 +211,11 @@ class GcodeViewLoader:
     path_halfwidth = 0.2
     path_halfheight = 0.15
 
-    def addfile_perlayer(self, gcode: Optional[gcoder.GCode] = None, showall: bool = False) -> Iterator[Union[int, None]]:
+    def addfile_perlayer(self, gcode: Optional[gcoder.GCode]=None,
+                         showall: bool=False, light_model: bool=False
+                         ) -> Iterator[Union[int, None]]:
         self.model = create_model(self.root.settings.light3d
-                                  if self.root else False)
+                                  if self.root else light_model)
         if isinstance(self.model, actors.GcodeModel):
             self.model.set_path_size(self.path_halfwidth, self.path_halfheight)
         self.objects[-1].model = self.model
@@ -228,8 +230,9 @@ class GcodeViewLoader:
         wx.CallAfter(self.Refresh)
         yield None
 
-    def addfile(self, gcode: Optional[gcoder.GCode] = None, showall: bool = False) -> None:
-        generator = self.addfile_perlayer(gcode, showall)
+    def addfile(self, gcode: Optional[gcoder.GCode]=None, showall: bool=False,
+                light_model: bool=False) -> None:
+        generator = self.addfile_perlayer(gcode, showall, light_model)
         while next(generator) is not None:
             continue
 
@@ -402,12 +405,12 @@ class GcodeViewFrame(GvizBaseFrame, GcodeViewLoader):
         colour = self.root.gcview_color_background
         self.glpanel.recreate_platform(build_dimensions, circular, grid, colour)
 
-    def addfile(self, gcode: Optional[gcoder.GCode] = None) -> None:
+    def addfile(self, gcode: Optional[gcoder.GCode] = None, light_model=False) -> None:
         if self.clonefrom:
             self.model = self.clonefrom[-1].model.copy()
             self.objects[-1].model = self.model
         else:
-            GcodeViewLoader.addfile(self, gcode)
+            GcodeViewLoader.addfile(self, gcode, light_model=light_model)
         assert self.model is not None
         self.layerslider.SetRange(1, self.model.max_layers + 1)
         self.layerslider.SetValue(self.model.max_layers + 1)
@@ -448,7 +451,8 @@ if __name__ == "__main__":
     with open(testfile, 'r', encoding = 'UTF-8') as file:
         gcode = gcoder.GCode(file, get_home_pos(build_dimensions))
 
-    frame.addfile(gcode)
+    light = "light" in sys.argv
+    frame.addfile(gcode, light)
 
     first_move = None
     for i in range(len(gcode.lines)):
