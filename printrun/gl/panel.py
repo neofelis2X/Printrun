@@ -33,8 +33,7 @@ from pyglet.gl import glEnable,glBlendFunc,glViewport, glClear, \
 
 from pyglet import gl
 
-from .mathutils import np_unproject, np_to_gl_mat, mat4_translation, \
-                       mat4_rotation, mat4_scaling
+from .mathutils import np_unproject
 from . import renderer
 from . import actors
 from . import camera
@@ -264,9 +263,9 @@ class wxGLPanel(BASE_CLASS):
             self.gl_broken = True
             return
 
-        self.shader["basic"] = shader
-        self.focus.load()
-        self.platform.load()
+        self.shader = shader
+        self.focus.load(self.shader)
+        self.platform.load(self.shader)
 
         if call_reshape:
             self.OnReshape()
@@ -324,12 +323,17 @@ class wxGLPanel(BASE_CLASS):
         if not new_shader:
             return
 
-        new_shader.use()
-        old_shader = self.shader["basic"]
-        self.shader["basic"] = new_shader
-        old_shader.delete()
+        old_shader = self.shader.copy()
+
+        # Important: We update the values in the dictionary, not the
+        # whole dictionary, because it is referenced in the actors
+        self.shader["basic"] = new_shader["basic"]
+        self.shader["lines"] = new_shader["lines"]
+
+        for old in old_shader.values():
+            old.delete()
+
         logging.info("OpenGL shader has been reloaded.")
-        print("OpenGL shader has been reloaded.")
         wx.CallAfter(self.Refresh)
 
     def recreate_platform(self, build_dimensions: Build_Dims,
@@ -352,15 +356,17 @@ class wxGLPanel(BASE_CLASS):
 
         glClearColor(*self.color_background)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-        self.shader["basic"].use()
 
-        renderer.load_mvp_uniform(self.shader["basic"].id, self.camera, self.platform)
+        self.shader["lines"].use()
+        renderer.load_mvp_uniform(self.shader["lines"].id, self.camera, self.platform)
         self.platform.draw()
-        self.draw_objects()
 
         if self.canvas.HasFocus():
-            renderer.load_mvp_uniform(self.shader["basic"].id, self.camera, self.focus)
+            renderer.load_mvp_uniform(self.shader["lines"].id, self.camera, self.focus)
             self.focus.draw()
+
+        self.shader["basic"].use()
+        self.draw_objects()
 
         self.canvas.SwapBuffers()
 
