@@ -31,70 +31,60 @@ from pyglet.gl import GLfloat, GLuint, \
 # for type hints
 from typing import Optional, Dict, List
 
-SRC_VERT_BASIC = Path("printrun/assets/shader/basic.vert.glsl")
-SRC_FRAG_BASIC = Path("printrun/assets/shader/basic.frag.glsl")
-SRC_VERT_LINES = Path("printrun/assets/shader/lines.vert.glsl")
-SRC_GEOM_LINES = Path("printrun/assets/shader/lines.geom.glsl")
-SRC_FRAG_LINES = Path("printrun/assets/shader/lines.frag.glsl")
+SRC_SHADER_DIR = Path("printrun/assets/shader/")
 
 
 def load_shader() -> Optional[Dict[str, shader.ShaderProgram]]:
-    shs = _compile_shaders(SRC_VERT_BASIC, SRC_FRAG_BASIC)
-    if shs:
-        vert_sh, frag_sh = shs[0], shs[1]
-    else:
+    if not SRC_SHADER_DIR.is_dir():
+        logging.error("Directory containing the \
+        shader is not accessible.\nPath: %s" % SRC_SHADER_DIR.resolve())
         return None
 
+    srcs = SRC_SHADER_DIR.glob("*.glsl")
+    shader_kinds = {".vert": "vertex",
+                    ".frag": "fragment",
+                    ".geom": "geometry"}
+    shs = {}
+    for src in srcs:
+        kind = shader_kinds[src.suffixes[0]]
+        sh = _compile_shader(src, kind)
+        if not sh:
+            return None
+        shs[src.stem] = sh
+
     try:
-        basic_program = shader.ShaderProgram(vert_sh, frag_sh)
+        basic_program = shader.ShaderProgram(shs["basic.vert"],
+                                             shs["basic.frag"])
     except shader.ShaderException as e:
         logging.error("Error creating the 'basic' shader program: %s" % e)
         return None
-
     logging.debug("Successfully created the 'basic' shader program.")
-    vert_sh.delete()
-    frag_sh.delete()
-
-    shs = _compile_shaders(SRC_VERT_LINES, SRC_FRAG_LINES, SRC_GEOM_LINES)
-    if shs:
-        vert_sh, frag_sh, geom_sh = shs[0], shs[1], shs[2]
-    else:
-        return None
 
     try:
-        lines_program = shader.ShaderProgram(vert_sh, frag_sh, geom_sh)
+        lines_program = shader.ShaderProgram(shs["lines.vert"],
+                                             shs["lines.frag"])
     except shader.ShaderException as e:
         logging.error("Error creating the 'lines' shader program:%s" % e)
         return None
-
     logging.debug("Successfully created the 'lines' shader program.")
-    vert_sh.delete()
-    frag_sh.delete()
-    geom_sh.delete()
 
-    return {"basic": basic_program, "lines": lines_program}
+    try:
+        thick_program = shader.ShaderProgram(shs["lines.vert"],
+                                             shs["thicklines.geom"],
+                                             shs["lines.frag"])
+    except shader.ShaderException as e:
+        logging.error("Error creating the 'thicklines' shader program:%s" % e)
+        return None
+    logging.debug("Successfully created the 'thicklines' shader program.")
 
-def _compile_shaders(vert_src: Path, frag_src: Path,
-                    geom_src: Optional[Path]=None
-                     ) -> Optional[List[shader.Shader]]:
+    for sh in shs.values():
+        sh.delete()
 
-    new_shaders = []
-    vert_shader = _compile_shader(vert_src, "vertex")
-    new_shaders.append(vert_shader)
-    frag_shader = _compile_shader(frag_src, "fragment")
-    new_shaders.append(frag_shader)
+    return {"basic": basic_program,
+            "lines": lines_program,
+            "thicklines": thick_program}
 
-    if geom_src:
-        geom_shader = _compile_shader(geom_src, "geometry")
-        new_shaders.append(geom_shader)
-
-    for sh in new_shaders:
-        if not sh:
-            return None
-
-    return new_shaders
-
-def _compile_shader(src: Path, kind: shader.ShaderType) -> Optional[shader.Shader]:
+def _compile_shader(src: Path, kind: str) -> Optional[shader.Shader]:
     if not src.is_file():
         logging.error("Source file for %s shader is not available." % src.name)
         return None

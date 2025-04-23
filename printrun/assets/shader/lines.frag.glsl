@@ -1,10 +1,12 @@
 #version 330 core
 
-in vec4 fragColor;
+in VertexData {
+    vec4 fColor;
+} fs_in;
 
 out vec4 FragColor;
 
 void main()
 {
-    FragColor = fragColor;
+    FragColor = fs_in.fColor;
 }
