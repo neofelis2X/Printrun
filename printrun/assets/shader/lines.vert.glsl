@@ -6,10 +6,12 @@ uniform mat4 modelViewProjection;
 uniform int doOverwriteColor;
 uniform vec4 oColor;
 
-out vec4 fColor;
+out VertexData {
+    vec4 fColor;
+} vs_out;
 
 void main()
 {
     gl_Position = modelViewProjection * vec4(vPos.x, vPos.y, vPos.z, 1.0);
-    fColor = (doOverwriteColor == 1) ? oColor : vColor;
+    vs_out.fColor = (doOverwriteColor == 1) ? oColor : vColor;
 }
