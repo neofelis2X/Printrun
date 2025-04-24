@@ -21,12 +21,14 @@ from pyglet.graphics import shader
 
 from pyglet.gl import GLfloat, GLuint, \
                       GL_ELEMENT_ARRAY_BUFFER, GL_FLOAT, GL_ARRAY_BUFFER, \
-                      GL_STATIC_DRAW, GL_FALSE, GL_TRUE, \
+                      GL_STATIC_DRAW, GL_FALSE, GL_TRUE, GL_UNIFORM_BUFFER, \
+                      GL_DYNAMIC_DRAW, \
                       glGenVertexArrays, glBindVertexArray, glGenBuffers, \
                       glBindBuffer, glBufferData, glEnableVertexAttribArray, \
                       glVertexAttribPointer, glGetUniformLocation, \
                       glUniformMatrix4fv, glUniform1i, glUniform4f, \
-                      glUniform3f
+                      glUniform3f, glGetUniformBlockIndex, glBindBufferRange, \
+                      glUniformBlockBinding, glBufferSubData
 
 # for type hints
 from typing import Optional, Dict, List
@@ -98,22 +100,12 @@ def _compile_shader(src: Path, kind: str) -> Optional[shader.Shader]:
     return new_shader
 
 def load_mvp_uniform(shader_id, camera, actor):
-    if actor.is_3d:
-        mat = camera.projection @ camera.view @ actor.modelmatrix
-        modelmat = actor.modelmatrix
-    else:
-        mat = camera.projection2d
-        modelmat = np.identity(4, dtype=GLfloat)
-    view = camera.eye
-
-    location = glGetUniformLocation(shader_id, b"modelViewProjection")
-    ptr = mat.ctypes.data_as(ctypes.POINTER(GLfloat))
-    glUniformMatrix4fv(location, 1, GL_TRUE, ptr)
-
+    modelmat = actor.modelmatrix
     location = glGetUniformLocation(shader_id, b"modelMat")
     ptr = modelmat.ctypes.data_as(ctypes.POINTER(GLfloat))
     glUniformMatrix4fv(location, 1, GL_TRUE, ptr)
 
+    view = camera.eye
     location = glGetUniformLocation(shader_id, b"viewPos")
     ptr = view.ctypes.data_as(ctypes.POINTER(GLfloat))
     glUniform3f(location, *view.data)
@@ -124,10 +116,16 @@ def load_uniform(shader_id, uniform_name: str, data):
     if location == -1:
         logging.warning("Could not find Uniform location.")
         return
-    if uniform_name == "doOverwriteColor":
+
+    if uniform_name in ("doOverwriteColor", "is_2d"):
         glUniform1i(location, int(data))
     elif uniform_name == "oColor":
         glUniform4f(location, *data)
+    elif uniform_name == "viewPos":
+        glUniform3f(location, *data.data)  # FIXME: looks strange
+    elif uniform_name == "modelMat":
+        ptr = data.ctypes.data_as(ctypes.POINTER(GLfloat))
+        glUniformMatrix4fv(location, 1, GL_TRUE, ptr)
 
 def interleave_vertex_data(verts, color, normal: Optional[np.ndarray]=None,
                            distinct_colors=False, distinct_normals=False):
@@ -153,6 +151,43 @@ def interleave_vertex_data(verts, color, normal: Optional[np.ndarray]=None,
                 data[iv + 7:iv + 10] = normal
 
     return data
+
+def create_ubo():
+    """
+    Creates a uniform buffer object
+    """
+    ubo = GLuint(0)
+    bytesize = ctypes.sizeof(GLfloat)
+    glGenBuffers(1, ubo)
+    glBindBuffer(GL_UNIFORM_BUFFER, ubo)
+    glBufferData(GL_UNIFORM_BUFFER, 32 * bytesize, None, GL_DYNAMIC_DRAW)
+    glBindBuffer(GL_UNIFORM_BUFFER, 0)
+
+    glBindBufferRange(GL_UNIFORM_BUFFER, 0, ubo, 0, 32 * bytesize)
+    #glBindBufferRange(GL_UNIFORM_BUFFER, 1, ubo, 64 * bytesize, 8 * bytesize)
+
+    return ubo
+
+def bind_shader_ublock(shaderlist, ublock_name: str) -> None:
+    ublock_index = GLuint(0)
+    binding_point = 0
+    byte_name = ublock_name.encode(encoding="utf-8")
+    for sh in shaderlist.values():
+        ublock_index = glGetUniformBlockIndex(sh.id, byte_name)
+        glUniformBlockBinding(sh.id, ublock_index, binding_point)
+
+def update_ubo_data(ubo, camera, ortho2d: bool=False):
+    if ortho2d:
+        mat = camera.projection2d
+        mat = mat.T.copy()
+        offset = mat.nbytes
+    else:
+        mat = camera.projection @ camera.view
+        mat = mat.T.copy()
+        offset = 0
+    glBindBuffer(GL_UNIFORM_BUFFER, ubo)
+    glBufferSubData(GL_UNIFORM_BUFFER, offset, mat.nbytes, mat.ctypes.data)
+    glBindBuffer(GL_UNIFORM_BUFFER, 0)
 
 def create_buffers(create_ebo=True, lines_only=False):
     """
@@ -199,6 +234,7 @@ def fill_buffer(buffer, data, kind) -> None:
     gl_array = get_gl_array(data)
     glBindBuffer(kind, buffer)
     glBufferData(kind, ctypes.sizeof(gl_array), gl_array, GL_STATIC_DRAW)
+    #glBindBuffer(kind, 0)
 
 def get_gl_array(pylist):
     if isinstance(pylist[0], int):

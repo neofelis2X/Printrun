@@ -40,6 +40,7 @@ class Camera():
         self.is_orthographic = ortho
         self.orbit_control = True
         self.view_matrix_initialized = False
+        self._has_changed = False
 
         self.width = 1.0
         self.height = 1.0
@@ -63,15 +64,22 @@ class Camera():
         self._ortho2d_mat = np.identity(4, dtype=np.float32)
 
     @property
+    def has_changed(self) -> bool:
+        return self._has_changed
+
+    @property
     def eye(self) -> np.ndarray:
+        self._has_changed = False
         return self._eye
 
     @property
     def view(self) -> np.ndarray:
+        self._has_changed = False
         return self._view_mat
 
     @property
     def projection(self) -> np.ndarray:
+        self._has_changed = False
         return self._proj_mat
 
     @property
@@ -142,6 +150,7 @@ class Camera():
         else:
             self._proj_mat = mat4_perspective(self.FOV, self.width / self.height,
                                               0.1, 5.5 * self.dist)
+        self._has_changed = True
 
     def _rebuild_ortho2d_mat(self) -> None:
         '''Create orthogonal matrix to render
@@ -149,6 +158,7 @@ class Camera():
 
         self._ortho2d_mat = mat4_orthographic(0.0, self.width, 0.0,
                                               self.height, -1.0, 1.0)
+        self._has_changed = True
 
     def move_rel(self, x: float, y: float, z: float) -> None:
         """
@@ -347,6 +357,7 @@ class Camera():
 
     def _rebuild_view_mat(self) -> None:
         self._view_mat = self._look_at(self._eye , self._target, self._up)
+        self._has_changed = True
 
     def _look_at(self, eye: np.ndarray,
                        center: np.ndarray,

@@ -109,6 +109,7 @@ class wxGLPanel(BASE_CLASS):
         self.width = 1.0
         self.height = 1.0
 
+        self.ubo = -1
         self.shader = {}
         self.camera = camera.Camera(self, build_dimensions,
                                     ortho = not perspective)
@@ -257,6 +258,7 @@ class wxGLPanel(BASE_CLASS):
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         glEnable(GL_LINE_SMOOTH)
 
+        self.ubo = renderer.create_ubo()
         shader = renderer.load_shader()
         if not shader:
             logging.error("Error happened loading the OpenGL shader.")
@@ -264,6 +266,7 @@ class wxGLPanel(BASE_CLASS):
             return
 
         self.shader = shader
+        renderer.bind_shader_ublock(self.shader, "Camera")
         self.focus.load(self.shader)
         self.platform.load(self.shader)
 
@@ -288,6 +291,7 @@ class wxGLPanel(BASE_CLASS):
         self.height = max(float(height), 1.0)
 
         self.camera.update_size(width, height, self.GetContentScaleFactor())
+        renderer.update_ubo_data(self.ubo, self.camera, ortho2d=True)
         self.focus.update_size()
 
         if not self.camera.view_matrix_initialized:
@@ -350,6 +354,8 @@ class wxGLPanel(BASE_CLASS):
     def DrawCanvas(self) -> None:
         """Draw the window."""
         self.set_current_context()
+        if self.camera.has_changed:
+            renderer.update_ubo_data(self.ubo, self.camera)
 
         if self.show_frametime:
             self.frametime.start_frame()
