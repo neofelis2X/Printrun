@@ -468,9 +468,12 @@ class Focus(ActorBaseClass):
         # # Draw a stippled line around the vertices
         # glLineStipple(1, 0xff00)
         # glEnable(GL_LINE_STIPPLE)
+        shader_id = self.shaderlist["lines"].id
+        renderer.load_uniform(shader_id, "is_2d", True)
         # TODO: Draw stippled line with line shader
         glBindVertexArray(self.vao)
         glDrawElements(GL_LINES, len(self.indices), GL_UNSIGNED_INT, 0)
+        renderer.load_uniform(shader_id, "is_2d", False)
 
 
 class CuttingPlane(ActorBaseClass):
