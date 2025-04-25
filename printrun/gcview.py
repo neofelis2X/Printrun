@@ -136,14 +136,7 @@ class GcodeViewPanel(wxGLPanel):
             # May need to lock load() and draw_objects() together
             # if not model.initialized:
             #     continue
-
-            if isinstance(model, actors.GcodeModelLight):
-                sh = "lines"
-            else:
-                sh = "basic"
             model.update(obj)
-            self.shader[sh].use()
-            renderer.load_mvp_uniform(self.shader[sh].id, self.camera, model)
             model.draw()
 
     # ==========================================================================
@@ -427,16 +420,16 @@ if __name__ == "__main__":
     app = wx.App(redirect = False)
 
     build_dimensions = (200, 200, 100, 0, 0, 0)
-    title = _("G-Code Viewer")
+    title = "G-Code 3D View Testwindow"
+    size = wx.Size((700, 600))
     persp = "perspective" in sys.argv
 
-    frame = GcodeViewFrame(None, wx.ID_ANY, title, size = (700, 600),
+    frame = GcodeViewFrame(None, wx.ID_ANY, title, size=size,
                            build_dimensions = build_dimensions,
                            antialias_samples = 4,
                            circular = False,
                            perspective = persp)
     frame.SetMinClientSize((200, 200))
-    #frame.root.settings.light3d = True
 
     frame.glpanel.show_frametime = True
     frame.glpanel.init_frametime()

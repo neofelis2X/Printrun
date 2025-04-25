@@ -70,7 +70,7 @@ class Camera():
     @property
     def eye(self) -> np.ndarray:
         self._has_changed = False
-        return self._eye
+        return self._eye.astype(dtype=np.float32)
 
     @property
     def view(self) -> np.ndarray:

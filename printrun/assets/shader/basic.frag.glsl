@@ -1,12 +1,17 @@
 #version 330 core
 
+layout(std140) uniform Camera {
+    mat4 ViewProjection;
+    mat4 Ortho2dProjection;
+    vec3 viewPos;
+    vec2 viewportSize;
+};
+
 in VertexData {
     vec4 fColor;
     vec3 fPos;
     vec3 fNormal;
 } fs_in;
-
-uniform vec3 viewPos;
 
 const vec3 lightDiffColor = vec3(0.8);
 const vec3 lightSpecColor = vec3(1.0);
@@ -22,8 +27,7 @@ const vec3 lightPos[NUM_LIGHTS] = vec3[](
 
 out vec4 FragColor;
 
-void main()
-{
+void main() {
     // Ambient Light
     vec3 ambient = ambientStrength * lightDiffColor;
 
