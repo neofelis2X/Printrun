@@ -335,6 +335,9 @@ class Platform(ActorBaseClass):
         self.color = colors
 
     def draw(self) -> None:
+        self.shaderlist["lines"].use()
+        renderer.load_uniform(self.shaderlist["lines"].id, "modelMat",
+                              self.modelmatrix)
         glBindVertexArray(self.vao)
         glDrawElements(GL_LINES, len(self.indices), GL_UNSIGNED_INT, 0)
 
@@ -409,6 +412,9 @@ class MouseCursor(ActorBaseClass):
         return (vertices, indices)
 
     def draw(self) -> None:
+        self.shaderlist["basic"].use()
+        renderer.load_uniform(self.shaderlist["basic"].id, "modelMat",
+                              self.modelmatrix)
         glDisable(GL_CULL_FACE)
         glBindVertexArray(self.vao)
         glDrawElements(GL_TRIANGLES, len(self.indices), GL_UNSIGNED_INT, 0)
@@ -468,12 +474,14 @@ class Focus(ActorBaseClass):
         # # Draw a stippled line around the vertices
         # glLineStipple(1, 0xff00)
         # glEnable(GL_LINE_STIPPLE)
-        shader_id = self.shaderlist["lines"].id
-        renderer.load_uniform(shader_id, "is_2d", True)
+        self.shaderlist["lines"].use()
+        sid = self.shaderlist["lines"].id
+        renderer.load_uniform(sid, "modelMat", self.modelmatrix)
+        renderer.load_uniform(sid, "is_2d", True)
         # TODO: Draw stippled line with line shader
         glBindVertexArray(self.vao)
         glDrawElements(GL_LINES, len(self.indices), GL_UNSIGNED_INT, 0)
-        renderer.load_uniform(shader_id, "is_2d", False)
+        renderer.load_uniform(sid, "is_2d", False)
 
 
 class CuttingPlane(ActorBaseClass):
@@ -554,14 +562,22 @@ class CuttingPlane(ActorBaseClass):
         if self.dist is None:
             return
 
+        self.shaderlist["basic"].use()
+        renderer.load_uniform(self.shaderlist["basic"].id, "modelMat",
+                              self.modelmatrix)
         # Draw the plane
         glDisable(GL_CULL_FACE)
         glBindVertexArray(self.vao)
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0)
-        glEnable(GL_CULL_FACE)
+
         # Draw the outline on the plane
-        # TODO: Draw a thick outline with lineshader
+        self.shaderlist["thicklines"].use()
+        renderer.load_uniform(self.shaderlist["thicklines"].id, "modelMat",
+                              self.modelmatrix)
+        renderer.load_uniform(self.shaderlist["thicklines"].id,
+                              "u_thickness", 3.0)
         glDrawElements(GL_LINES, 8, GL_UNSIGNED_INT, 6 * sizeof(GLuint))
+        glEnable(GL_CULL_FACE)
 
 
 # TODO: It would be nice to have a visual representation of the printhead
@@ -617,6 +633,9 @@ class MeshModel(ActorBaseClass):
         renderer.fill_buffer(self.ebo, self.indices.data, GL_ELEMENT_ARRAY_BUFFER)
 
     def draw(self) -> None:
+        self.shaderlist["basic"].use()
+        renderer.load_uniform(self.shaderlist["basic"].id, "modelMat",
+                              self.modelmatrix)
         glBindVertexArray(self.vao)
         glDrawElements(GL_TRIANGLES, len(self.indices), GL_UNSIGNED_INT, 0)
 
@@ -806,7 +825,7 @@ class GcodeModel(Model):
     Model for displaying Gcode data.
     """
 
-    color_travel =  (0.6, 0.6, 0.6, 0.6)
+    color_travel =  (0.8, 0.8, 0.8, 1.0)
     color_tool0 =   (1.0, 0.0, 0.0, 1.0)
     color_tool1 =   (0.67, 0.05, 0.9, 1.0)
     color_tool2 =   (1.0, 0.8, 0.0, 1.0)
@@ -815,7 +834,7 @@ class GcodeModel(Model):
     color_printed = (0.2, 0.75, 0.0, 1.0)
     color_current = (0.0, 0.9, 1.0, 1.0)
     color_current_printed = (0.1, 0.4, 0, 1.0)
-    color_current_travel =  (0.8, 0.0, 1.0, 0.6)
+    color_current_travel =  (0.8, 0.0, 1.0, 1.0)
     # TODO: Add this color to settings
 
     display_travels = True
@@ -1246,12 +1265,18 @@ class GcodeModel(Model):
         with self.lock:
 
             if self.display_travels:
+                self.shaderlist["lines"].use()
+                renderer.load_uniform(self.shaderlist["lines"].id, "modelMat",
+                                      self.modelmatrix)
                 self._display_travels()
 
+            self.shaderlist["basic"].use()
+            renderer.load_uniform(self.shaderlist["basic"].id, "modelMat",
+                                  self.modelmatrix)
             self._display_movements()
 
     def _display_travels(self) -> None:
-        shader_id = self.shaderlist["basic"].id
+        sid = self.shaderlist["lines"].id
         # Prevent race condition by using the number of currently loaded layers
         max_layers = self.layers_loaded
         end = self.layer_stops[min(self.num_layers_to_draw, max_layers)]
@@ -1262,14 +1287,14 @@ class GcodeModel(Model):
             end_prev_layer = self.layer_stops[self.num_layers_to_draw - 1]
             start_index = self.count_travel_indices[end_prev_layer + 1]
 
-            renderer.load_uniform(shader_id, "doOverwriteColor", True)
-            renderer.load_uniform(shader_id, "oColor",
+            renderer.load_uniform(sid, "doOverwriteColor", True)
+            renderer.load_uniform(sid, "oColor",
                                   self.color_current_travel)
 
             glDrawArrays(GL_LINES, self.travels_offset + start_index,
                          end_index - start_index + 1)
 
-            renderer.load_uniform(shader_id, "doOverwriteColor", False)
+            renderer.load_uniform(sid, "doOverwriteColor", False)
             end_index = start_index
 
         # Draw all other visible travels
@@ -1288,7 +1313,7 @@ class GcodeModel(Model):
                             sizeof(GLuint) * self.count_print_indices[start - 1])
 
     def _display_movements(self) -> None:
-        shader_id = self.shaderlist["basic"].id
+        sid = self.shaderlist["basic"].id
         # Prevent race condition by using the number of currently loaded layers
         max_layers = self.layers_loaded
 
@@ -1300,8 +1325,8 @@ class GcodeModel(Model):
             end_prev_layer = 0
         end = self.layer_stops[min(self.num_layers_to_draw, max_layers)]
 
-        renderer.load_uniform(shader_id, "doOverwriteColor", True)
-        renderer.load_uniform(shader_id, "oColor", self.color_printed)
+        renderer.load_uniform(sid, "doOverwriteColor", True)
+        renderer.load_uniform(sid, "oColor", self.color_printed)
 
         # Draw printed stuff until end or end_prev_layer
         cur_end = min(self.printed_until, end)
@@ -1311,7 +1336,7 @@ class GcodeModel(Model):
             elif cur_end >= 1:
                 self._draw_elements(1, cur_end)
 
-        renderer.load_uniform(shader_id, "doOverwriteColor", False)
+        renderer.load_uniform(sid, "doOverwriteColor", False)
 
         # Draw nonprinted stuff until end_prev_layer
         start = max(cur_end, 1)
@@ -1322,18 +1347,18 @@ class GcodeModel(Model):
 
         # Draw current layer
         if layer_selected:
-            renderer.load_uniform(shader_id, "doOverwriteColor", True)
-            renderer.load_uniform(shader_id, "oColor", self.color_current_printed)
+            renderer.load_uniform(sid, "doOverwriteColor", True)
+            renderer.load_uniform(sid, "oColor", self.color_current_printed)
 
             if cur_end > end_prev_layer:
                 self._draw_elements(end_prev_layer + 1, cur_end)
 
-            renderer.load_uniform(shader_id, "oColor", self.color_current)
+            renderer.load_uniform(sid, "oColor", self.color_current)
 
             if end > cur_end:
                 self._draw_elements(cur_end + 1, end)
 
-            renderer.load_uniform(shader_id, "doOverwriteColor", False)
+            renderer.load_uniform(sid, "doOverwriteColor", False)
 
         # Draw non printed stuff until end (if not ending at a given layer)
         start = max(self.printed_until, 1)
@@ -1346,15 +1371,15 @@ class GcodeModelLight(Model):
     Model for displaying Gcode data.
     """
 
-    color_travel =  (0.6, 0.6, 0.6, 0.6)
-    color_tool0 =   (1.0, 0.0, 0.0, 0.6)
+    color_travel =  (0.8, 0.8, 0.8, 1.0)
+    color_tool0 =   (0.85, 0.0, 0.0, 0.6)
     color_tool1 =   (0.67, 0.05, 0.9, 0.6)
     color_tool2 =   (1.0, 0.8, 0.0, 0.6)
     color_tool3 =   (1.0, 0.0, 0.62, 0.6)
     color_tool4 =   (0.0, 1.0, 0.58, 0.6)
-    color_printed = (0.2, 0.75, 0.0, 0.6)
-    color_current = (0.0, 0.9, 1.0, 0.8)
-    color_current_printed = (0.1, 0.4, 0.0, 0.8)
+    color_printed = (0.15, 0.65, 0.0, 1.0)
+    color_current = (0.0, 0.9, 1.0, 1.0)
+    color_current_printed = (0.1, 0.4, 0.0, 1.0)
 
     buffers_created = False
     loaded = False
@@ -1503,18 +1528,21 @@ class GcodeModelLight(Model):
 
             if self.fully_loaded:
                 # Delete numpy arrays after creating VBOs after full load
-                self.vertices = np.zeros(0, dtype = GLfloat)
-                self.colors = np.zeros(0, dtype = GLfloat)
+                self.vertices = np.zeros(0, dtype=GLfloat)
+                self.colors = np.zeros(0, dtype=GLfloat)
 
             self.buffers_created = True
 
     def draw(self) -> None:
+        self.shaderlist["lines"].use()
+        renderer.load_uniform(self.shaderlist["lines"].id, "modelMat",
+                              self.modelmatrix)
         glBindVertexArray(self.vao)
         with self.lock:
             self._display_movements()
 
     def _display_movements(self) -> None:
-        shader_id = self.shaderlist["lines"].id
+        sid = self.shaderlist["lines"].id
 
         # Prevent race condition by using the number of currently loaded layers
         max_layers = self.layers_loaded
@@ -1526,8 +1554,8 @@ class GcodeModelLight(Model):
             end_prev_layer = -1
         end = self.layer_stops[min(self.num_layers_to_draw, max_layers)]
 
-        renderer.load_uniform(shader_id, "doOverwriteColor", True)
-        renderer.load_uniform(shader_id, "oColor", self.color_printed)
+        renderer.load_uniform(sid, "doOverwriteColor", True)
+        renderer.load_uniform(sid, "oColor", self.color_printed)
 
         # Draw printed stuff until end or end_prev_layer
         cur_end = min(self.printed_until, end)
@@ -1537,7 +1565,7 @@ class GcodeModelLight(Model):
             elif cur_end >= 0:
                 glDrawArrays(GL_LINES, start, cur_end)
 
-        renderer.load_uniform(shader_id, "doOverwriteColor", False)
+        renderer.load_uniform(sid, "doOverwriteColor", False)
 
         # Draw nonprinted stuff until end_prev_layer
         start = max(cur_end, 0)
@@ -1548,34 +1576,29 @@ class GcodeModelLight(Model):
 
         # Draw current layer
         if end_prev_layer >= 0:
-            # Backup & increase line width
-            #orig_linewidth = (GLfloat)()
-            #glGetFloatv(GL_LINE_WIDTH, orig_linewidth)
-            #glLineWidth(2.0)
-
-            renderer.load_uniform(shader_id, "doOverwriteColor", True)
-            renderer.load_uniform(shader_id, "oColor",
+            self.shaderlist["thicklines"].use()
+            sid = self.shaderlist["thicklines"].id
+            renderer.load_uniform(sid, "modelMat", self.modelmatrix)
+            # TODO: get display scalefactor
+            renderer.load_uniform(sid, "u_thickness", 3.0)
+            renderer.load_uniform(sid, "doOverwriteColor", True)
+            renderer.load_uniform(sid, "oColor",
                                   self.color_current_printed)
 
             if cur_end > end_prev_layer:
                 glDrawArrays(GL_LINES, end_prev_layer, cur_end - end_prev_layer)
 
-            renderer.load_uniform(shader_id, "oColor",
+            renderer.load_uniform(sid, "oColor",
                                   self.color_current)
 
             if end > cur_end:
                 glDrawArrays(GL_LINES, cur_end, end - cur_end)
 
-            renderer.load_uniform(shader_id, "doOverwriteColor", False)
-            # Restore line width
-            #glLineWidth(orig_linewidth)
+            renderer.load_uniform(sid, "doOverwriteColor", False)
 
         # Draw non printed stuff until end (if not ending at a given layer)
         start = max(self.printed_until, 0)
         end = end - start
         if end_prev_layer < 0 < end and not self.only_current:
             glDrawArrays(GL_LINES, start, end)
-
-        self.shaderlist["basic"].use()
-
 

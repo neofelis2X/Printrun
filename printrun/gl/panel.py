@@ -29,7 +29,8 @@ from pyglet.gl import glEnable,glBlendFunc,glViewport, glClear, \
                       glClearColor, glClearDepth, glDepthFunc, \
                       GL_ONE_MINUS_SRC_ALPHA,GL_DEPTH_BUFFER_BIT, \
                       GL_SRC_ALPHA, GL_BLEND, GL_COLOR_BUFFER_BIT, \
-                      GL_CULL_FACE, GL_DEPTH_TEST, GL_LESS, GL_LINE_SMOOTH
+                      GL_CULL_FACE, GL_DEPTH_TEST, GL_LESS, GL_LINE_SMOOTH, \
+                      GL_MULTISAMPLE
 
 from pyglet import gl
 
@@ -257,6 +258,7 @@ class wxGLPanel(BASE_CLASS):
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         glEnable(GL_LINE_SMOOTH)
+        glEnable(GL_MULTISAMPLE)
 
         self.ubo = renderer.create_ubo()
         shader = renderer.load_shader()
@@ -291,7 +293,8 @@ class wxGLPanel(BASE_CLASS):
         self.height = max(float(height), 1.0)
 
         self.camera.update_size(width, height, self.GetContentScaleFactor())
-        renderer.update_ubo_data(self.ubo, self.camera, ortho2d=True)
+        renderer.update_ubo_data(self.ubo, self.camera, ortho2d=True,
+                                 viewport=(self.width, self.height))
         self.focus.update_size()
 
         if not self.camera.view_matrix_initialized:
@@ -333,6 +336,7 @@ class wxGLPanel(BASE_CLASS):
         # whole dictionary, because it is referenced in the actors
         self.shader["basic"] = new_shader["basic"]
         self.shader["lines"] = new_shader["lines"]
+        self.shader["thicklines"] = new_shader["thicklines"]
 
         for old in old_shader.values():
             old.delete()
@@ -363,15 +367,11 @@ class wxGLPanel(BASE_CLASS):
         glClearColor(*self.color_background)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
-        self.shader["lines"].use()
-        renderer.load_mvp_uniform(self.shader["lines"].id, self.camera, self.platform)
         self.platform.draw()
 
         if self.canvas.HasFocus():
-            renderer.load_mvp_uniform(self.shader["lines"].id, self.camera, self.focus)
             self.focus.draw()
 
-        self.shader["basic"].use()
         self.draw_objects()
 
         self.canvas.SwapBuffers()
