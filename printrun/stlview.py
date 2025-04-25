@@ -144,7 +144,6 @@ class StlViewPanel(wxGLPanel):
 
         if intersection is not None:
             self.gl_cursor.position = intersection
-            renderer.load_mvp_uniform(self.shader["basic"].id, self.camera, self.gl_cursor)
             self.gl_cursor.draw()
 
         # Draw objects
@@ -152,7 +151,6 @@ class StlViewPanel(wxGLPanel):
             model = self.parent.models[i].batch
             # FIXME: transformation shouldnt be updated every frame.
             model.update()
-            renderer.load_mvp_uniform(self.shader["basic"].id, self.camera, model)
             model.draw()
 
         # Draw cutting plane
@@ -166,7 +164,6 @@ class StlViewPanel(wxGLPanel):
                 # TODO: Check if plane has even changed (use buttonEvent?)
                 self.cutting_plane.update_plane(axis, direction)
                 self.cutting_plane.update_position(dist)
-                renderer.load_mvp_uniform(self.shader["basic"].id, self.camera, self.cutting_plane)
                 self.cutting_plane.draw()
 
     # ==========================================================================

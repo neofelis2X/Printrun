@@ -26,7 +26,7 @@ from pyglet.gl import GLfloat, GLuint, \
                       glGenVertexArrays, glBindVertexArray, glGenBuffers, \
                       glBindBuffer, glBufferData, glEnableVertexAttribArray, \
                       glVertexAttribPointer, glGetUniformLocation, \
-                      glUniformMatrix4fv, glUniform1i, glUniform4f, \
+                      glUniformMatrix4fv, glUniform1i, glUniform1f, glUniform4f, \
                       glUniform3f, glGetUniformBlockIndex, glBindBufferRange, \
                       glUniformBlockBinding, glBufferSubData
 
@@ -119,6 +119,8 @@ def load_uniform(shader_id, uniform_name: str, data):
 
     if uniform_name in ("doOverwriteColor", "is_2d"):
         glUniform1i(location, int(data))
+    elif uniform_name in ("u_thickness", ):
+        glUniform1f(location, data)
     elif uniform_name == "oColor":
         glUniform4f(location, *data)
     elif uniform_name == "viewPos":
@@ -160,10 +162,10 @@ def create_ubo():
     bytesize = ctypes.sizeof(GLfloat)
     glGenBuffers(1, ubo)
     glBindBuffer(GL_UNIFORM_BUFFER, ubo)
-    glBufferData(GL_UNIFORM_BUFFER, 32 * bytesize, None, GL_DYNAMIC_DRAW)
+    glBufferData(GL_UNIFORM_BUFFER, 128 * bytesize, None, GL_DYNAMIC_DRAW)
     glBindBuffer(GL_UNIFORM_BUFFER, 0)
 
-    glBindBufferRange(GL_UNIFORM_BUFFER, 0, ubo, 0, 32 * bytesize)
+    glBindBufferRange(GL_UNIFORM_BUFFER, 0, ubo, 0, 128 * bytesize)
     #glBindBufferRange(GL_UNIFORM_BUFFER, 1, ubo, 64 * bytesize, 8 * bytesize)
 
     return ubo
@@ -176,17 +178,26 @@ def bind_shader_ublock(shaderlist, ublock_name: str) -> None:
         ublock_index = glGetUniformBlockIndex(sh.id, byte_name)
         glUniformBlockBinding(sh.id, ublock_index, binding_point)
 
-def update_ubo_data(ubo, camera, ortho2d: bool=False):
+def update_ubo_data(ubo, camera, ortho2d: bool=False, viewport=(1.0, 1.0)):
+    glBindBuffer(GL_UNIFORM_BUFFER, ubo)
+    bytesize = ctypes.sizeof(GLfloat)
     if ortho2d:
         mat = camera.projection2d
         mat = mat.T.copy()
         offset = mat.nbytes
+        vp = np.array(viewport, dtype=np.float32)
+        vp_offset = (16 + 16 + 4) * bytesize
+        glBufferSubData(GL_UNIFORM_BUFFER, offset, mat.nbytes, mat.ctypes.data)
+        glBufferSubData(GL_UNIFORM_BUFFER, vp_offset, vp.nbytes, vp.ctypes.data)
     else:
         mat = camera.projection @ camera.view
         mat = mat.T.copy()
         offset = 0
-    glBindBuffer(GL_UNIFORM_BUFFER, ubo)
-    glBufferSubData(GL_UNIFORM_BUFFER, offset, mat.nbytes, mat.ctypes.data)
+        eye = camera.eye
+        eye_offset = 2 * mat.nbytes
+        glBufferSubData(GL_UNIFORM_BUFFER, offset, mat.nbytes, mat.ctypes.data)
+        glBufferSubData(GL_UNIFORM_BUFFER, eye_offset, eye.nbytes,
+                        eye.ctypes.data)
     glBindBuffer(GL_UNIFORM_BUFFER, 0)
 
 def create_buffers(create_ebo=True, lines_only=False):
