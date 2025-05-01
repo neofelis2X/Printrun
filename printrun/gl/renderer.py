@@ -73,7 +73,7 @@ def load_shader() -> Optional[Dict[str, shader.ShaderProgram]]:
     try:
         thick_program = shader.ShaderProgram(shs["lines.vert"],
                                              shs["thicklines.geom"],
-                                             shs["lines.frag"])
+                                             shs["thicklines.frag"])
     except shader.ShaderException as e:
         logging.error("Error creating the 'thicklines' shader program:%s" % e)
         return None
@@ -117,9 +117,9 @@ def load_uniform(shader_id, uniform_name: str, data):
         logging.warning("Could not find Uniform location.")
         return
 
-    if uniform_name in ("doOverwriteColor", "is_2d"):
+    if isinstance(data, bool):
         glUniform1i(location, int(data))
-    elif uniform_name in ("u_thickness", ):
+    elif isinstance(data, float):
         glUniform1f(location, data)
     elif uniform_name == "oColor":
         glUniform4f(location, *data)
@@ -178,7 +178,7 @@ def bind_shader_ublock(shaderlist, ublock_name: str) -> None:
         ublock_index = glGetUniformBlockIndex(sh.id, byte_name)
         glUniformBlockBinding(sh.id, ublock_index, binding_point)
 
-def update_ubo_data(ubo, camera, ortho2d: bool=False, viewport=(1.0, 1.0)):
+def update_ubo_data(ubo, camera, ortho2d: bool=False, viewport=(1.0, 1.0, 1.0)):
     glBindBuffer(GL_UNIFORM_BUFFER, ubo)
     bytesize = ctypes.sizeof(GLfloat)
     if ortho2d:

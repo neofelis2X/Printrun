@@ -444,7 +444,7 @@ class Focus(ActorBaseClass):
 
         self.is_initialised = True
         self.update_size()
-        self.indices = [0, 1, 1, 2, 2, 3, 3, 0]
+        self.indices = [1, 0, 1, 2, 2, 3, 0, 3]
         renderer.fill_buffer(self.ebo, self.indices, GL_ELEMENT_ARRAY_BUFFER)
 
     def update_size(self) -> None:
@@ -452,7 +452,7 @@ class Focus(ActorBaseClass):
             return
 
         # Starts at the lower left corner, x, y
-        offset = 4.0 * self.camera.display_ppi_factor
+        offset = 1.0 * self.camera.display_ppi_factor
         self.vertices = ((offset, offset, 0.0),
                          (self.camera.width - offset, offset, 0.0),
                          (self.camera.width - offset, self.camera.height - offset, 0.0),
@@ -470,17 +470,14 @@ class Focus(ActorBaseClass):
         self.update_size()
 
     def draw(self) -> None:
-        # glDisable(GL_LIGHTING)
-        # # Draw a stippled line around the vertices
-        # glLineStipple(1, 0xff00)
-        # glEnable(GL_LINE_STIPPLE)
         self.shaderlist["lines"].use()
         sid = self.shaderlist["lines"].id
         renderer.load_uniform(sid, "modelMat", self.modelmatrix)
         renderer.load_uniform(sid, "is_2d", True)
-        # TODO: Draw stippled line with line shader
+        renderer.load_uniform(sid, "is_dashed", True)
         glBindVertexArray(self.vao)
         glDrawElements(GL_LINES, len(self.indices), GL_UNSIGNED_INT, 0)
+        renderer.load_uniform(sid, "is_dashed", False)
         renderer.load_uniform(sid, "is_2d", False)
 
 
