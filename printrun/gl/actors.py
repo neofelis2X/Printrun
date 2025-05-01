@@ -491,69 +491,82 @@ class CuttingPlane(ActorBaseClass):
         self.width = float(build_dimensions[0])
         self.depth = float(build_dimensions[1])
         self.height = float(build_dimensions[2])
-        self.cutplane_sizes = {"x": (self.depth, self.height),
-                               "y": (self.width, self.height),
-                               "z": (self.width, self.depth)}
-        self.axis = 'x'
+
+        self.axis = 'w'
         self.dist = 0.0
         self.cutting_direction = -1.0
-        self.plane_width = 0.0
-        self.plane_height = 0.0
+        self.plane_mat = np.identity(4, dtype=GLfloat)
 
         self.vertices = ()
         self.indices = []
         self.color = (0 / 255, 229 / 255, 38 / 255, 0.3)  # Light Green
         self.color_outline = (0 / 255, 204 / 255, 38 / 255, 1.0)  # Green
 
-    def _initialise_data(self) -> None:
-        self.vertices = 2 * ((self.plane_width, self.plane_height, 0.0),
-                         (0.0, self.plane_height, 0.0),
-                         (0.0, 0.2, 0.0),
-                         (self.plane_width, 0.2, 0.0))
-
-        colors = 4 * [self.color] + 4 * [self.color_outline]
-        normal = np.array((0.0, 0.0, self.cutting_direction))
-        vb = renderer.interleave_vertex_data(self.vertices, colors, normal,
-                                             distinct_colors=True)
-        renderer.fill_buffer(self.vbo, vb, GL_ARRAY_BUFFER)
-
     def load(self, shader):
         self.shaderlist = shader
         self.vao, self.vbo, self.ebo = renderer.create_buffers()
+        self.vertices = 2 * ((0.5, 0.5, 0.0),
+                             (-0.5, 0.5, 0.0),
+                             (-0.5, -0.5, 0.0),
+                             (0.5, -0.5, 0.0))
+
+        colors = 4 * [self.color] + 4 * [self.color_outline]
+        normal = np.array((0.0, 0.0, 1.0))
+        vb = renderer.interleave_vertex_data(self.vertices, colors, normal,
+                                             distinct_colors=True)
+        renderer.fill_buffer(self.vbo, vb, GL_ARRAY_BUFFER)
 
         self.indices = [0, 1, 2, 3, 0, 2,  # plane
                         6, 5, 5, 4, 4, 7, 7, 6]  # outline
         renderer.fill_buffer(self.ebo, self.indices, GL_ELEMENT_ARRAY_BUFFER)
 
     def update_plane(self, axis: str, cutting_direction: int) -> None:
+        if self.axis == axis and self.cutting_direction == cutting_direction:
+            return
+
         self.axis = axis
         self.cutting_direction = float(cutting_direction)
-        self.plane_width, self.plane_height = self.cutplane_sizes[axis]
-        self._initialise_data()
+
+        if self.axis == 'x':
+            if self.cutting_direction < 0.0:
+                rm = mat4_rotation(0.0, 1.0, 0.0, -90.0)
+            else:
+                rm = mat4_rotation(0.0, 1.0, 0.0, 90.0)
+            tm = mat4_translation(0.0, 0.5, 0.5)
+            sm = mat4_scaling(0.0, self.depth, self.height)
+
+        elif self.axis == 'y':
+            if self.cutting_direction < 0.0:
+                rm = mat4_rotation(1.0, 0.0, 0.0, -90.0)
+            else:
+                rm = mat4_rotation(1.0, 0.0, 0.0, 90.0)
+            tm = mat4_translation(0.5, 0.0, 0.5)
+            sm = mat4_scaling(self.width, 0.0, self.height)
+
+        else:
+            if self.cutting_direction < 0.0:
+                rm = mat4_rotation(1.0, 0.0, 0.0, 180.0)
+            else:
+                rm = np.identity(4, dtype=GLfloat)
+            tm = mat4_translation(0.5, 0.5, 0.0)
+            sm = mat4_scaling(self.width, self.depth, 0.0)
+
+        self.plane_mat = rm.T @ tm.T @ sm.T
 
     def update_position(self, dist: float) -> None:
         self.dist = dist
         if self.dist is None:
             return
 
-        # TODO: Utilise transforms (scale) instead of vertex reupload
-        if self.axis == "x":
-            rm1 = mat4_rotation(0.0, 1.0, 0.0, 90.0)
-            rm2 = mat4_rotation(0.0, 0.0, 1.0, 90.0)
-            tm = mat4_translation(0.0, 0.0, self.dist)
-            mat = tm.T @ rm2.T @ rm1.T
-            mat = mat.T.copy()
-        elif self.axis == "y":
-            rm = mat4_rotation(1.0, 0.0, 0.0, 90.0)
-            tm = mat4_translation(0.0, 0.0, -self.dist)
-            mat = tm.T @ rm.T
-            mat = mat.T.copy()
-        elif self.axis == "z":
-            mat = mat4_translation(0.0, 0.0, self.dist)
+        if self.axis == 'x':
+            tm = mat4_translation(self.dist, 0.0, 0.2)
+        elif self.axis == 'y':
+            tm = mat4_translation(0.0, self.dist, 0.2)
         else:
-            mat = np.identity(4)
+            tm = mat4_translation(0.0, 0.0, self.dist)
 
-        self._modelmatrix = mat
+        mat = self.plane_mat @ tm.T
+        self._modelmatrix = mat.T.copy()
 
     def draw(self) -> None:
         if self.dist is None:
@@ -572,7 +585,7 @@ class CuttingPlane(ActorBaseClass):
         renderer.load_uniform(self.shaderlist["thicklines"].id, "modelMat",
                               self.modelmatrix)
         renderer.load_uniform(self.shaderlist["thicklines"].id,
-                              "u_thickness", 3.0)
+                              "u_thickness", 1.5)
         glDrawElements(GL_LINES, 8, GL_UNSIGNED_INT, 6 * sizeof(GLuint))
         glEnable(GL_CULL_FACE)
 
