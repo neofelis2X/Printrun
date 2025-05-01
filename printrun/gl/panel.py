@@ -109,6 +109,7 @@ class wxGLPanel(BASE_CLASS):
 
         self.width = 1.0
         self.height = 1.0
+        self.display_ppi_factor = 1.0
 
         self.ubo = -1
         self.shader = {}
@@ -280,7 +281,8 @@ class wxGLPanel(BASE_CLASS):
         self.set_current_context()
         old_width, old_height = self.width, self.height
 
-        new_size = self.GetClientSize() * self.GetContentScaleFactor()
+        self.display_ppi_factor = self.GetContentScaleFactor()
+        new_size = self.GetClientSize() * self.display_ppi_factor
         width, height = new_size.width, new_size.height
 
         if width < 1 or height < 1:
@@ -292,9 +294,9 @@ class wxGLPanel(BASE_CLASS):
         self.width = max(float(width), 1.0)
         self.height = max(float(height), 1.0)
 
-        self.camera.update_size(width, height, self.GetContentScaleFactor())
+        self.camera.update_size(width, height, self.display_ppi_factor)
         renderer.update_ubo_data(self.ubo, self.camera, ortho2d=True,
-                                 viewport=(self.width, self.height))
+                                 viewport=(self.width, self.height, self.display_ppi_factor))
         self.focus.update_size()
 
         if not self.camera.view_matrix_initialized:
@@ -461,7 +463,7 @@ class wxGLPanel(BASE_CLASS):
             return
 
         self.set_current_context()
-        self.mousepos = event.GetPosition() * self.GetContentScaleFactor()
+        self.mousepos = event.GetPosition() * self.display_ppi_factor
 
         if event.Dragging():
             if event.LeftIsDown():
@@ -488,7 +490,7 @@ class wxGLPanel(BASE_CLASS):
 
     def handle_wheel(self, event: wx.MouseEvent) -> None:
         '''This runs when Mousewheel is used'''
-        x, y = event.GetPosition() * self.GetContentScaleFactor()
+        x, y = event.GetPosition() * self.display_ppi_factor
         factor = 1.02 if event.GetModifiers() == wx.MOD_CONTROL else 1.05
 
         if event.GetWheelRotation() > 0:

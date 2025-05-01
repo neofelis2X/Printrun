@@ -4,7 +4,7 @@ layout(std140) uniform Camera {
     mat4 ViewProjection;
     mat4 Ortho2dProjection;
     vec3 viewPos;
-    vec2 viewportSize;
+    vec3 viewportSize;
 };
 
 in VertexData {
