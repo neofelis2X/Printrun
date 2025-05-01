@@ -245,13 +245,17 @@ class TestFrame(wx.Frame):
         self.cutting_direction = 1.0
         self.cutting_dist = 29.0
 
-
 def main() -> None:
     STL_TESTMODEL = Path(__file__, "../../testfiles/testgeometry_ascii.stl").resolve()
     app = wx.App(redirect = False)
     size = wx.Size(600, 450)
     frame = TestFrame(None, -1, "Mesh GL Window", size = size)
     frame.SetMinClientSize((200, 200))
+    for arg in sys.argv:
+        if arg.startswith("cut"):
+            frame.cutting_axis = arg[4] if arg[4] in ('x', 'y', 'z') else 'x'
+            frame.cutting_direction = -1.0 if arg[3] == '-' else 1.0
+
     persp = "perspective" in sys.argv
 
     stl_panel = StlViewPanel(frame, size,
