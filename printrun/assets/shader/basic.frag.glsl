@@ -49,6 +49,11 @@ void main() {
         lightResult += diffuse + specular;
     }
 
-    vec3 result = lightResult * fs_in.fColor.rgb;
+    vec3 result;
+    if (gl_FrontFacing) {
+        result = lightResult * fs_in.fColor.rgb;
+    } else {
+        result = lightResult * fs_in.fColor.rgb * vec3(0.3, 0.3, 0.3);
+    }
     FragColor = vec4(result, fs_in.fColor.a);
 }
