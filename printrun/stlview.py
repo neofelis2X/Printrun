@@ -140,10 +140,11 @@ class StlViewPanel(wxGLPanel):
 
         # Draw mouse
         intersection = self.mouse_to_plane(self.mousepos[0], self.mousepos[1],
-                                    plane_normal = (0, 0, 1), plane_offset = 0)
+                                           plane_normal = (0, 0, 1),
+                                           plane_offset = 0)
 
         if intersection is not None:
-            self.gl_cursor.position = intersection
+            self.gl_cursor.update(intersection)
             self.gl_cursor.draw()
 
         # Draw objects

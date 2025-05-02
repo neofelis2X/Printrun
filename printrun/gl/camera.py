@@ -378,7 +378,7 @@ class Camera():
         # Recalculate the up vector (y-axis in camera space)
         true_up = np.cross(right, forward)
 
-        view_matrix = np.identity(4, dtype=np.float32)
+        view_matrix = np.eye(4, dtype=np.float32, order='F')
 
         # Negate z-vector to look at the viewer
         forward = -forward
