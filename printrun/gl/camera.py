@@ -140,12 +140,11 @@ class Camera():
 
     def _rebuild_proj_mat(self) -> None:
         if self.is_orthographic:
-            # FIXME: Something regarding the ortho "zoom" does not behave as expected.
-            ddf = 50.0 * self.dolly_factor  # 50.0 used to be 2.0 ??
-            self._proj_mat = mat4_orthographic(-self.width / ddf,
-                                               self.width / ddf,
-                                               -self.height / ddf,
-                                               self.height / ddf,
+            ddf = self.dolly_factor * 0.5
+            self._proj_mat = mat4_orthographic(-self.width * ddf,
+                                               self.width * ddf,
+                                               -self.height * ddf,
+                                               self.height * ddf,
                                                0.01, 3 * self.dist)
         else:
             self._proj_mat = mat4_perspective(self.FOV, self.width / self.height,
