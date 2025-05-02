@@ -102,14 +102,13 @@ class ActorBaseClass(ABC):
     """
     Cursor where the mouse should be in 3D space.
     """
-    is_3d = True
     shaderlist = {}
 
     def __init__(self) -> None:
         self.vao = GLuint(0)
         self.vbo = GLuint(0)
         self.ebo = GLuint(0)
-        self._modelmatrix = np.identity(4, dtype=np.float32)
+        self._modelmatrix = np.eye(4, dtype=np.float32, order='F')
 
     @property
     def modelmatrix(self) -> np.ndarray:
@@ -348,7 +347,6 @@ class MouseCursor(ActorBaseClass):
     """
     def __init__(self) -> None:
         super().__init__()
-        self.position = (0.0, 0.0, 0.0)
         self.vertices: List[Tuple[float, float, float]] = []
         self.indices: List[int] = []
         self.color = (225 / 255, 0 / 255, 45 / 255, 1.0)  # Red
@@ -356,11 +354,10 @@ class MouseCursor(ActorBaseClass):
 
     @property
     def modelmatrix(self):
-        self._modelmatrix = mat4_translation(*self.position)
         return self._modelmatrix
 
-    def update_position(self, position_3d: Tuple[float, float, float]) -> None:
-        self.position = position_3d
+    def update(self, position_3d: Tuple[float, float, float]) -> None:
+        self._modelmatrix = mat4_translation(*position_3d)
 
     def load(self, shader) -> None:
         self.shaderlist = shader
@@ -372,19 +369,19 @@ class MouseCursor(ActorBaseClass):
 
     def _initialise_data(self) -> None:
         self.vertices, self.indices = self._circle()
-        #self.vertices, self.indices = self._rectangle()
+        # self.vertices, self.indices = self._rectangle()
 
     def _circle(self) -> Tuple[List[Tuple[float, float, float]], List[int]]:
         radius = 2.0
-        segments = 32  #  Resolution of the circle.
-        z_height = 0.01
+        segments = 32  # Resolution of the circle.
+        z_height = 0.025
         vertices = [(0.0, 0.0, z_height),  # this is the center point
                     (0.0, radius, z_height)]  # this is first point on the top
         indices: List[int] = []
 
         vert_n = 0
         for i in range(segments):
-            alpha = math.tau / segments * i
+            alpha = -math.tau / segments * i
             new_x = radius * math.sin(alpha)
             new_y = radius * math.cos(alpha)
             # Add one new vertex coordinate
@@ -428,7 +425,6 @@ class Focus(ActorBaseClass):
 
     COLOR_LIGHT = (205 / 255, 205 / 255, 205 / 255)
     COLOR_DARK = (15 / 255, 15 / 255, 15 / 255)
-    is_3d = False
 
     def __init__(self, cam: camera.Camera) -> None:
         super().__init__()
@@ -491,11 +487,14 @@ class CuttingPlane(ActorBaseClass):
         self.width = float(build_dimensions[0])
         self.depth = float(build_dimensions[1])
         self.height = float(build_dimensions[2])
+        self.offsets = (float(build_dimensions[3]),
+                        float(build_dimensions[4]),
+                        float(build_dimensions[5]))
 
         self.axis = 'w'
         self.dist = 0.0
         self.cutting_direction = -1.0
-        self.plane_mat = np.identity(4, dtype=GLfloat)
+        self.plane_mat = np.eye(4, dtype=GLfloat, order='F')
 
         self.vertices = ()
         self.indices = []
@@ -547,11 +546,12 @@ class CuttingPlane(ActorBaseClass):
             if self.cutting_direction < 0.0:
                 rm = mat4_rotation(1.0, 0.0, 0.0, 180.0)
             else:
-                rm = np.identity(4, dtype=GLfloat)
+                rm = np.eye(4, dtype=GLfloat, order='C')
             tm = mat4_translation(0.5, 0.5, 0.0)
             sm = mat4_scaling(self.width, self.depth, 0.0)
 
-        self.plane_mat = rm.T @ tm.T @ sm.T
+        om = mat4_translation(*self.offsets)
+        self.plane_mat = rm @ tm @ sm @ om
 
     def update_position(self, dist: float) -> None:
         self.dist = dist
@@ -565,8 +565,7 @@ class CuttingPlane(ActorBaseClass):
         else:
             tm = mat4_translation(0.0, 0.0, self.dist)
 
-        mat = self.plane_mat @ tm.T
-        self._modelmatrix = mat.T.copy()
+        self._modelmatrix = self.plane_mat @ tm
 
     def draw(self) -> None:
         if self.dist is None:
@@ -618,9 +617,8 @@ class MeshModel(ActorBaseClass):
         rm = mat4_rotation(0.0, 0.0, 1.0, model.rot)
         tc = mat4_translation(*model.centeroffset)
         sm = mat4_scaling(*model.scale)
-        mat = sm.T @ tc.T @ rm.T @ tm.T
 
-        self._modelmatrix = mat.T.copy()
+        self._modelmatrix = sm @ tc @ rm @ tm
 
     def _initialise_data(self) -> None:
         # Create the vertex and normal arrays.
@@ -724,9 +722,8 @@ class Model(ActorBaseClass):
         rm = mat4_rotation(0.0, 0.0, 1.0, model.rot)
         tc = mat4_translation(*model.centeroffset)
         sm = mat4_scaling(*model.scale)
-        mat = sm.T @ tc.T @ rm.T @ tm.T
 
-        self._modelmatrix = mat.T.copy()
+        self._modelmatrix = sm @ tc @ rm @ tm
 
     def _calculate_bounding_box(self) -> BoundingBox:
         """

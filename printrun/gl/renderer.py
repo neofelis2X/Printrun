@@ -99,18 +99,6 @@ def _compile_shader(src: Path, kind: str) -> Optional[shader.Shader]:
 
     return new_shader
 
-def load_mvp_uniform(shader_id, camera, actor):
-    modelmat = actor.modelmatrix
-    location = glGetUniformLocation(shader_id, b"modelMat")
-    ptr = modelmat.ctypes.data_as(ctypes.POINTER(GLfloat))
-    glUniformMatrix4fv(location, 1, GL_TRUE, ptr)
-
-    view = camera.eye
-    location = glGetUniformLocation(shader_id, b"viewPos")
-    ptr = view.ctypes.data_as(ctypes.POINTER(GLfloat))
-    glUniform3f(location, *view.data)
-
-
 def load_uniform(shader_id, uniform_name: str, data):
     location = glGetUniformLocation(shader_id, uniform_name.encode())
     if location == -1:
@@ -127,7 +115,7 @@ def load_uniform(shader_id, uniform_name: str, data):
         glUniform3f(location, *data.data)  # FIXME: looks strange
     elif uniform_name == "modelMat":
         ptr = data.ctypes.data_as(ctypes.POINTER(GLfloat))
-        glUniformMatrix4fv(location, 1, GL_TRUE, ptr)
+        glUniformMatrix4fv(location, 1, GL_FALSE, ptr)
 
 def interleave_vertex_data(verts, color, normal: Optional[np.ndarray]=None,
                            distinct_colors=False, distinct_normals=False):
@@ -183,7 +171,6 @@ def update_ubo_data(ubo, camera, ortho2d: bool=False, viewport=(1.0, 1.0, 1.0)):
     bytesize = ctypes.sizeof(GLfloat)
     if ortho2d:
         mat = camera.projection2d
-        mat = mat.T.copy()
         offset = mat.nbytes
         vp = np.array(viewport, dtype=np.float32)
         vp_offset = (16 + 16 + 4) * bytesize
