@@ -11,16 +11,9 @@ layout(std140) uniform Camera {
 };
 
 uniform mat4 modelMat;
+uniform mat3 u_NormalMat;
 uniform int doOverwriteColor;
 uniform vec4 oColor;
-
-// TODO: separate viewprojection and model
-// introduce a "is2d" uniform, one int
-// viewprojection and 2dprojection in ubo
-// introduce hasChanged to camera
-// update only on hasChanged
-// update modelmatrix per model
-// compare performance
 
 out VertexData {
     vec4 fColor;
@@ -29,8 +22,8 @@ out VertexData {
 } vs_out;
 
 void main() {
-    gl_Position = ViewProjection * modelMat * vec4(vPos.x, vPos.y, vPos.z, 1.0);
+    gl_Position = ViewProjection * modelMat * vec4(vPos.xyz, 1.0);
     vs_out.fColor = (doOverwriteColor == 1) ? oColor : vColor;
     vs_out.fPos = vec3(modelMat * vec4(vPos, 1.0));
-    vs_out.fNormal = vNormal;
+    vs_out.fNormal = normalize(u_NormalMat * vNormal);
 }
