@@ -28,7 +28,7 @@ from pyglet.gl import GLfloat, GLuint, \
                       glVertexAttribPointer, glGetUniformLocation, \
                       glUniformMatrix4fv, glUniform1i, glUniform1f, glUniform4f, \
                       glUniform3f, glGetUniformBlockIndex, glBindBufferRange, \
-                      glUniformBlockBinding, glBufferSubData
+                      glUniformBlockBinding, glBufferSubData, glUniformMatrix3fv
 
 # for type hints
 from typing import Optional, Dict, List
@@ -113,9 +113,21 @@ def load_uniform(shader_id, uniform_name: str, data):
         glUniform4f(location, *data)
     elif uniform_name == "viewPos":
         glUniform3f(location, *data.data)  # FIXME: looks strange
+    elif uniform_name == "u_NormalMat":
+        ptr = data.ctypes.data_as(ctypes.POINTER(GLfloat))
+        glUniformMatrix3fv(location, 1, GL_FALSE, ptr)
     elif uniform_name == "modelMat":
         ptr = data.ctypes.data_as(ctypes.POINTER(GLfloat))
         glUniformMatrix4fv(location, 1, GL_FALSE, ptr)
+
+def get_normal_mat(model_mat: np.ndarray) -> np.ndarray:
+    sub = model_mat[0:3, 0:3]
+    try:
+        inv_mat = np.linalg.inv(sub)
+    except np.linalg.LinAlgError as e:
+        logging.warning("Error inverting normal matrix: %s" % e)
+        return sub
+    return inv_mat.T
 
 def interleave_vertex_data(verts, color, normal: Optional[np.ndarray]=None,
                            distinct_colors=False, distinct_normals=False):
@@ -232,7 +244,6 @@ def fill_buffer(buffer, data, kind) -> None:
     gl_array = get_gl_array(data)
     glBindBuffer(kind, buffer)
     glBufferData(kind, ctypes.sizeof(gl_array), gl_array, GL_STATIC_DRAW)
-    #glBindBuffer(kind, 0)
 
 def get_gl_array(pylist):
     if isinstance(pylist[0], int):
