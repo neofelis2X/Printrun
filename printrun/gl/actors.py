@@ -412,6 +412,9 @@ class MouseCursor(ActorBaseClass):
         self.shaderlist["basic"].use()
         renderer.load_uniform(self.shaderlist["basic"].id, "modelMat",
                               self.modelmatrix)
+        norm_mat = renderer.get_normal_mat(self.modelmatrix)
+        renderer.load_uniform(self.shaderlist["basic"].id, "u_NormalMat",
+                              norm_mat)
         glDisable(GL_CULL_FACE)
         glBindVertexArray(self.vao)
         glDrawElements(GL_TRIANGLES, len(self.indices), GL_UNSIGNED_INT, 0)
@@ -494,7 +497,7 @@ class CuttingPlane(ActorBaseClass):
         self.axis = 'w'
         self.dist = 0.0
         self.cutting_direction = -1.0
-        self.plane_mat = np.eye(4, dtype=GLfloat, order='F')
+        self.plane_mat = np.eye(4, dtype=GLfloat, order='C')
 
         self.vertices = ()
         self.indices = []
@@ -528,27 +531,27 @@ class CuttingPlane(ActorBaseClass):
 
         if self.axis == 'x':
             if self.cutting_direction < 0.0:
-                rm = mat4_rotation(0.0, 1.0, 0.0, -90.0)
+                rm = mat4_rotation(0.0, 1.0, 0.0, 270.0)
             else:
                 rm = mat4_rotation(0.0, 1.0, 0.0, 90.0)
             tm = mat4_translation(0.0, 0.5, 0.5)
-            sm = mat4_scaling(0.0, self.depth, self.height)
+            sm = mat4_scaling(1.0, self.depth, self.height)
 
         elif self.axis == 'y':
             if self.cutting_direction < 0.0:
-                rm = mat4_rotation(1.0, 0.0, 0.0, -90.0)
+                rm = mat4_rotation(1.0, 0.0, 0.0, 270.0)
             else:
                 rm = mat4_rotation(1.0, 0.0, 0.0, 90.0)
             tm = mat4_translation(0.5, 0.0, 0.5)
-            sm = mat4_scaling(self.width, 0.0, self.height)
+            sm = mat4_scaling(self.width, 1.0, self.height)
 
         else:
             if self.cutting_direction < 0.0:
                 rm = mat4_rotation(1.0, 0.0, 0.0, 180.0)
             else:
-                rm = np.eye(4, dtype=GLfloat, order='C')
+                rm = mat4_rotation(1.0, 0.0, 0.0, 0.0)
             tm = mat4_translation(0.5, 0.5, 0.0)
-            sm = mat4_scaling(self.width, self.depth, 0.0)
+            sm = mat4_scaling(self.width, self.depth, 1.0)
 
         om = mat4_translation(*self.offsets)
         self.plane_mat = rm @ tm @ sm @ om
@@ -574,6 +577,9 @@ class CuttingPlane(ActorBaseClass):
         self.shaderlist["basic"].use()
         renderer.load_uniform(self.shaderlist["basic"].id, "modelMat",
                               self.modelmatrix)
+        norm_mat = renderer.get_normal_mat(self.modelmatrix)
+        renderer.load_uniform(self.shaderlist["basic"].id, "u_NormalMat",
+                              norm_mat)
         # Draw the plane
         glDisable(GL_CULL_FACE)
         glBindVertexArray(self.vao)
@@ -644,6 +650,9 @@ class MeshModel(ActorBaseClass):
         self.shaderlist["basic"].use()
         renderer.load_uniform(self.shaderlist["basic"].id, "modelMat",
                               self.modelmatrix)
+        norm_mat = renderer.get_normal_mat(self.modelmatrix)
+        renderer.load_uniform(self.shaderlist["basic"].id, "u_NormalMat",
+                              norm_mat)
         glBindVertexArray(self.vao)
         glDrawElements(GL_TRIANGLES, len(self.indices), GL_UNSIGNED_INT, 0)
 
@@ -1280,6 +1289,9 @@ class GcodeModel(Model):
             self.shaderlist["basic"].use()
             renderer.load_uniform(self.shaderlist["basic"].id, "modelMat",
                                   self.modelmatrix)
+            norm_mat = renderer.get_normal_mat(self.modelmatrix)
+            renderer.load_uniform(self.shaderlist["basic"].id, "u_NormalMat",
+                                  norm_mat)
             self._display_movements()
 
     def _display_travels(self) -> None:
@@ -1521,9 +1533,10 @@ class GcodeModelLight(Model):
             self.layers_loaded = self.max_layers
             self.initialized = True
             if self.buffers_created:
-                #self.vertex_buffer.delete()
-                #self.vertex_color_buffer.delete()
-                return
+                vb = renderer.interleave_vertex_data(self.vertices.reshape(-1, 3),
+                                                 self.colors.reshape(-1, 4),
+                                                 distinct_colors=True)
+                renderer.fill_buffer(self.vbo, vb, GL_ARRAY_BUFFER)
 
             # TODO: Indexed data would be nice to have?
             self.vao, self.vbo, _ = renderer.create_buffers(create_ebo=False,
