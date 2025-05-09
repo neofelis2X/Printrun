@@ -269,9 +269,9 @@ class wxGLPanel(BASE_CLASS):
             return
 
         self.shader = shader
-        renderer.bind_shader_ublock(self.shader, "Camera")
-        self.focus.load(self.shader)
-        self.platform.load(self.shader)
+        renderer.bind_shader_ublock(self.shader, "General")
+        self.focus.load(self.shader, self.ubo)
+        self.platform.load(self.shader, self.ubo)
 
         if call_reshape:
             self.OnReshape()
@@ -295,8 +295,8 @@ class wxGLPanel(BASE_CLASS):
         self.height = max(float(height), 1.0)
 
         self.camera.update_size(width, height, self.display_ppi_factor)
-        renderer.update_ubo_data(self.ubo, self.camera, ortho2d=True,
-                                 viewport=(self.width, self.height, self.display_ppi_factor))
+        renderer.update_ubo_viewport(self.ubo, self.camera,
+                                     (self.width, self.height, self.display_ppi_factor))
         self.focus.update_size()
 
         if not self.camera.view_matrix_initialized:
@@ -361,7 +361,7 @@ class wxGLPanel(BASE_CLASS):
         """Draw the window."""
         self.set_current_context()
         if self.camera.has_changed:
-            renderer.update_ubo_data(self.ubo, self.camera)
+            renderer.update_ubo_view(self.ubo, self.camera)
 
         if self.show_frametime:
             self.frametime.start_frame()

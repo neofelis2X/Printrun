@@ -1,10 +1,12 @@
 #version 330 core
 
-layout(std140) uniform Camera {
+layout(std140) uniform General {
     mat4 ViewProjection;
     mat4 Ortho2dProjection;
-    vec3 viewPos;
-    vec3 viewportSize;
+    vec3 ViewPos;
+    vec3 ViewportSize;
+    mat4 Transform;
+    mat3 NormalTransform;
 };
 
 in VertexData {
@@ -14,19 +16,19 @@ in VertexData {
 flat in vec3 startPos;
 in vec3 vertPos;
 
-uniform int is_dashed;
+uniform int u_isDashed;
 
-float dashSize = 5.0 * viewportSize.p;
-float gapSize = 4.0 * viewportSize.p;
+float dashSize = 5.0 * ViewportSize.p;
+float gapSize = 4.0 * ViewportSize.p;
 
 out vec4 FragColor;
 
 void main()
 {
-    if (is_dashed == 0) {
+    if (u_isDashed == 0) {
         FragColor = fs_in.fColor;
     } else {
-        vec2 dir = (vertPos.xy - startPos.xy) * viewportSize.xy / 2.0;
+        vec2 dir = (vertPos.xy - startPos.xy) * ViewportSize.xy / 2.0;
         float dist = length(dir);
 
         if (fract(dist / (dashSize + gapSize)) > dashSize / (dashSize + gapSize))
