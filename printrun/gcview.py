@@ -120,7 +120,7 @@ class GcodeViewPanel(wxGLPanel):
         for obj in self.parent.objects:
             if obj.model and obj.model.loaded and not obj.model.initialized:
                 self.set_current_context()
-                obj.model.load(self.shader)
+                obj.model.load(self.shader, self.ubo)
 
     def draw_objects(self) -> None:
         '''called in the middle of ondraw after the buffer has been cleared'''

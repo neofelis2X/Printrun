@@ -74,11 +74,11 @@ class StlViewPanel(wxGLPanel):
         '''Initialize OpenGL for use in the window.'''
         super().OnInitGL(call_reshape, *args, **kwargs)
 
-        self.gl_cursor.load(self.shader)
-        self.cutting_plane.load(self.shader)
+        self.gl_cursor.load(self.shader, self.ubo)
+        self.cutting_plane.load(self.shader, self.ubo)
         for i in self.parent.models:
             model = self.parent.models[i].batch
-            model.load(self.shader)
+            model.load(self.shader, self.ubo)
 
         if hasattr(self.parent, "filenames") and self.parent.filenames:
             for filename in self.parent.filenames:
@@ -129,7 +129,7 @@ class StlViewPanel(wxGLPanel):
         self.set_current_context()
         mesh = actors.MeshModel(m)
         m.batch = mesh
-        m.batch.load(self.shader)
+        m.batch.load(self.shader, self.ubo)
         self.meshmodels.append(mesh)
         # m.animoffset = 300
         # threading.Thread(target = self.anim, args = (m, )).start()
