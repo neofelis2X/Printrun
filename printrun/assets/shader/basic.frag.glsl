@@ -1,10 +1,12 @@
 #version 330 core
 
-layout(std140) uniform Camera {
+layout(std140) uniform General {
     mat4 ViewProjection;
     mat4 Ortho2dProjection;
-    vec3 viewPos;
-    vec3 viewportSize;
+    vec3 ViewPos;
+    vec3 ViewportSize;
+    mat4 Transform;
+    mat3 NormalTransform;
 };
 
 in VertexData {
@@ -33,7 +35,7 @@ void main() {
     vec3 ambient = ambientStrength * lightDiffColor;
 
     vec3 norm = fs_in.fNormal;
-    vec3 viewDir = normalize(viewPos - fs_in.fPos);
+    vec3 viewDir = normalize(ViewPos - fs_in.fPos);
     vec3 lightResult = vec3(0.0);
 
     for (int i = 0; i < NUM_LIGHTS; ++i) {
