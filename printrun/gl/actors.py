@@ -215,12 +215,14 @@ class Platform(ActorBaseClass):
 
     def _load_grid(self, z_val):
         vertices = []
-        indices = []
         colors = []
+        indices = []
         x_half = self.width / 2
         y_half = self.depth / 2
 
         # Grid lines in X
+        vert_x = []
+        col_x = []
         for x_val in np.arange(self.grid[0], int(math.ceil(x_half)),
                                self.grid[0], dtype=float):
             if self.is_circular:
@@ -231,13 +233,33 @@ class Platform(ActorBaseClass):
 
             col = self._color(x_val)
             if col:
-                colors.extend(4 * [col])
-                vertices.append((x_half + x_val, y_half + y_val, z_val))
-                vertices.append((x_half + x_val, y_half - y_val, z_val))
-                vertices.append((x_half - x_val, y_half + y_val, z_val))
-                vertices.append((x_half - x_val, y_half - y_val, z_val))
+                vert_x.append(((x_half + x_val, y_half + y_val, z_val),
+                                 (x_half + x_val, y_half - y_val, z_val)))
+                vert_x.append(((x_half - x_val, y_half + y_val, z_val),
+                                 (x_half - x_val, y_half - y_val, z_val)))
+                col_x.append((col, col))
+                col_x.append((col, col))
+
+        # Centerline
+        vert_x.append(((x_half, 2 * y_half, z_val), (x_half, 0.0, z_val)))
+        col_x.append((self.color_major, self.color_major))
+
+        # Lines are sorted to avoid transparency rendering issues
+        l = sorted(zip(vert_x, col_x))
+        l.sort()
+        vert_x, col_x = zip(*l)
+
+        for duo in vert_x:
+            vertices.append(duo[0])
+            vertices.append(duo[1])
+
+        for duo in col_x:
+            colors.append(duo[0])
+            colors.append(duo[1])
 
         # Grid lines in Y
+        vert_y = []
+        col_y = []
         for y_val in np.arange(self.grid[0], int(math.ceil(y_half)),
                                self.grid[0], dtype=float):
             if self.is_circular:
@@ -248,18 +270,29 @@ class Platform(ActorBaseClass):
 
             col = self._color(y_val)
             if col:
-                colors.extend(4 * [col])
-                vertices.append((x_half + x_val, y_half + y_val, z_val))
-                vertices.append((x_half - x_val, y_half + y_val, z_val))
-                vertices.append((x_half + x_val, y_half - y_val, z_val))
-                vertices.append((x_half - x_val, y_half - y_val, z_val))
+                vert_y.append(((x_half + x_val, y_half + y_val, z_val),
+                              (x_half - x_val, y_half + y_val, z_val)))
+                vert_y.append(((x_half + x_val, y_half - y_val, z_val),
+                               (x_half - x_val, y_half - y_val, z_val)))
+                col_y.append((col, col))
+                col_y.append((col, col))
 
-        # Center lines
-        colors.extend(4 * [self.color_major])
-        vertices.append((2 * x_half, y_half, z_val))
-        vertices.append((0.0, y_half, z_val))
-        vertices.append((x_half, 2 * y_half, z_val))
-        vertices.append((x_half, 0.0, z_val))
+        # Centerline
+        vert_y.append(((2 * x_half, y_half, z_val), (0.0, y_half, z_val)))
+        col_y.append((self.color_major, self.color_major))
+
+        # Lines are sorted to avoid transparency rendering issues
+        l = sorted(zip(vert_y, col_y))
+        l.sort()
+        vert_y, col_y = zip(*l)
+
+        for duo in vert_y:
+            vertices.append(duo[0])
+            vertices.append(duo[1])
+
+        for duo in col_y:
+            colors.append(duo[0])
+            colors.append(duo[1])
 
         indices.extend(range(0, len(vertices)))
 
