@@ -1,132 +1,134 @@
 An enormous number of people have contributed to Printrun (thank you!):
 
 # Developers
-- Kliment Yanev @kliment (code)
-- Guillaume Seguin @iXce (code)
-- @DivingDuck (code)
-- @volconst (code)
+- Kliment Yanev @kliment
+- Guillaume Seguin @iXce
+- @DivingDuck
+- @volconst
 - Rock Storm @rockstorm101 (code, packaging)
 - Miro Hrončok @hroncok (code, packaging)
-- Rob Gilson @D1plo1d (code)
-- Gary Hodgson @garyhodgson (code)
-- Neofelis @neofelis2X (code)
-- Duane Johnson (code,graphics)
-- Alessandro Ranellucci @alranel (code)
-- Travis Howse @tjhowse (code)
-- edef (code)
-- Steven Devijver (code)
-- Christopher Keller (code)
-- Igor Yeremin (code)
-- Jeremy Hammett @jezmy (code)
-- Spencer Bliven (code)
-- Václav \'ax\' Hůla  @AxTheB (code)
-- Félix Sipma (code)
-- Maja M. @SparkyCola (code)
-- Francesco Santini @fsantini (code)
-- Cristopher Olah @colah (code)
-- Jeremy Kajikawa (code)
-- Markus Hitter (code)
-- SkateBoss (code)
-- Kaz Walker (code)
-- Brendan Erwin (documentation)
-- Elias (code)
-- Jordan Miller (code)
-- Mikko Sivulainen (code)
-- Clarence Risher (code)
-- Guillaume Revaillot (code)
-- John Tapsell (code)
-- Youness Alaoui (code)
-- @eldir (code)
-- @hg42 (code)
-- @jglauche (code, documentation)
-- Ahmet Cem TURAN @ahmetcemturan (icons, code)
-- Andrew Dalgleish (code)
-- Benny (documentation)
-- Chillance (code)
-- Ilya Novoselov (code)
-- Joeri Hendriks (code)
-- Kevin Cole (code)
-- pinaise (code)
-- Dratone (code)
-- ERoth3 (code)
-- Erik Zalm (code)
-- Felipe Corrêa da Silva Sanches (code)
-- Geordie Bilkey (code)
-- Ken Aaker (code)
-- Lawrence (documentation)
-- Loxgen (code)
-- Matthias Urlichs (code)
-- N Oliver (code)
-- @nexus511 (code)
-- Sergey Shepelev (code)
-- Simon Maillard (code)
-- Vanessa Dannenberg (code)
-- @beardface (code)
-- @hurzl (code)
-- Justin Hawkins @beardface (code)
-- siorai (documentation)
-- tobbelobb (code)
+- Rob Gilson @D1plo1d
+- Gary Hodgson @garyhodgson
+- Duane Johnson (graphics, code)
+- Alessandro Ranellucci @alranel
+- Travis Howse @tjhowse
+- edef
+- Steven Devijver
+- Christopher Keller
+- Igor Yeremin
+- Jeremy Hammett @jezmy
+- Spencer Bliven
+- Václav \'ax\' Hůla  @AxTheB
+- Félix Sipma
+- Maja M. @SparkyCola
+- Francesco Santini @fsantini
+- Cristopher Olah @colah
+- Jeremy Kajikawa
+- Markus Hitter
+- SkateBoss
+- Kaz Walker
+- Elias
+- Jordan Miller
+- Mikko Sivulainen
+- Clarence Risher
+- Guillaume Revaillot
+- John Tapsell
+- Youness Alaoui
+- @eldir
+- @hg42
+- @jglauche (code, docs)
+- Ahmet Cem TURAN @ahmetcemturan (code, icons)
+- Andrew Dalgleish
+- Chillance
+- Ilya Novoselov
+- Joeri Hendriks
+- Kevin Cole
+- pinaise
+- Dratone
+- ERoth3
+- Erik Zalm
+- Felipe Corrêa da Silva Sanches
+- Geordie Bilkey
+- Ken Aaker
+- Loxgen
+- Matthias Urlichs
+- N Oliver
+- @nexus511
+- Sergey Shepelev
+- Simon Maillard
+- Vanessa Dannenberg
+- @beardface
+- @hurzl
+- Justin Hawkins @beardface
+- tobbelobb
 - 5ilver (packaging)
-- Alexander Hiam (code)
-- Alexander Zangerl (code)
-- Cameron Currie (code)
-- Chris DeLuca (documentation)
-- Colin Gilgenbach (code)
-- DanLipsitt (code)
-- Daniel Holth (code)
-- Denis B (code)
-- Erik Jonsson (code)
-- Felipe Acebes (code)
-- Florian Gilcher (code)
-- Henrik Brix Andersen (code)
-- Jan Wildeboer (documentation)
-- Javier Rios (code)
-- Jay Proulx (code)
-- Jim Morris (code)
-- Kyle Evans (code)
-- Lenbok (code)
-- Lukas Erlacher (code)
-- Michael Andresen @blddk (code)
-- NeoTheFox (code)
-- Nicolas Dandrimont (documentation)
-- OhmEye (code)
-- OliverEngineer (code)
-- Paul Telfort (code)
-- Sebastian \'Swift Geek\' Grzywna (code)
-- Senthil (documentation)
-- Sigma-One (code)
-- Spacexula (documentation)
-- Stefan Glatzel (code)
-- Stefanowicz (code)
-- Steven (code)
-- Tyler Hovanec (documentation)
-- Xabi Xab (code)
-- Xoan Sampaiño (code)
-- Yuri D\'Elia (code)
-- drf5n (code)
-- evilB (documentation)
-- fieldOfView (code)
-- jbh (code)
-- kludgineer (code)
-- l4nce0 (code)
-- palob (code)
-- russ (code)
-- Andrew McDonald (code)
+- Alexander Hiam
+- Alexander Zangerl
+- Cameron Currie
+- Colin Gilgenbach
+- DanLipsitt
+- Daniel Holth
+- Denis B
+- Erik Jonsson
+- Felipe Acebes
+- Florian Gilcher
+- Henrik Brix Andersen
+- Javier Rios
+- Jay Proulx
+- Jim Morris
+- Kyle Evans
+- Lenbok
+- Lukas Erlacher
+- Matthias @neofelis2X
+- Michael Andresen @blddk
+- NeoTheFox
+- OhmEye
+- OliverEngineer
+- Paul Telfort
+- Sebastian \'Swift Geek\' Grzywna
+- Sigma-One
+- Stefan Glatzel
+- Stefanowicz
+- Steven
+- Xabi Xab
+- Xoan Sampaiño
+- Yuri D\'Elia
+- drf5n
+- fieldOfView
+- jbh
+- kludgineer
+- l4nce0
+- palob
+- russ
+
+# Documentation Writers
+- Brendan Erwin
+- @jglauche (code, docs)
+- Benny
+- Lawrence
+- siorai
+- Chris DeLuca
+- Jan Wildeboer
+- Nicolas Dandrimont
+- Senthil
+- Spacexula
+- Tyler Hovanec
+- evilB
 
 # Artists
 - Ahmet Cem TURAN @ahmetcemturan (icons, code)
-- Duane Johnson (code,graphics)
-    
+- Duane Johnson (graphics, code)
+
 # Translators
-- freddii (German translation)
-- Christian Metzen @metzench (German translation)
-- Cyril Laguilhon-Debat (French translation)
-- @AvagSayan (Armenian translation)
-- Jonathan Marsden (French translation)
-- Ruben Lubbes (NL translation)
-- aboobed (Arabic translation)
-- Alessandro Ranellucci @alranel (Italian translation)
-        
+- freddii (German)
+- Christian Metzen @metzench (German)
+- Cyril Laguilhon-Debat (French)
+- @AvagSayan (Armenian)
+- Jonathan Marsden (French)
+- Ruben Lubbes (Dutch)
+- aboobed (Arabic)
+- Alessandro Ranellucci @alranel (Italian)
+
 This list was compiled manually.
 
 If you have contributed to Printrun and are not in this list, please file an issue or a pull request!
