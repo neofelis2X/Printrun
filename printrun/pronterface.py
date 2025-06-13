@@ -572,24 +572,30 @@ class PronterWindow(MainWindow, pronsole.pronsole):
         return append
 
     def cbkey(self, e):
-        dir = {wx.WXK_UP: -1, wx.WXK_DOWN: 1}.get(e.KeyCode)
-        if dir:
+        direction = {wx.WXK_UP: -1, wx.WXK_DOWN: 1}.get(e.KeyCode)
+        if direction:
             if self.commandbox.histindex == len(self.commandbox.history):
-                if dir == 1:
+                if direction == 1:
                     # do not cycle top => bottom
                     return
                 # save unsent command before going back
                 self.appendCommandHistory()
-            self.commandbox.histindex = max(0, min(self.commandbox.histindex + dir, len(self.commandbox.history)))
+            self.commandbox.histindex = max(0, min(self.commandbox.histindex + direction,
+                                                   len(self.commandbox.history)))
             self.commandbox.Value = (self.commandbox.history[self.commandbox.histindex]
-                if self.commandbox.histindex < len(self.commandbox.history)
-                else '')
+                                     if self.commandbox.histindex < len(self.commandbox.history)
+                                     else '')
             self.commandbox.SetInsertionPointEnd()
         else:
             e.Skip()
 
     def plate(self, e):
-        self.log(_("STL plate function activated"))
+        for window in self.GetChildren():
+            if isinstance(window, plater.StlPlater):
+                window.Show()
+                window.Raise()
+                return
+        self.log(_("Model plate function activated"))
         plater.StlPlater(size = (800, 580), callback = self.platecb,
                          parent = self,
                          build_dimensions = self.build_dimensions_list,
@@ -598,12 +604,17 @@ class PronterWindow(MainWindow, pronsole.pronsole):
                          antialias_samples = int(self.settings.antialias3dsamples)).Show()
 
     def plate_gcode(self, e):
+        for window in self.GetChildren():
+            if isinstance(window, gcplater.GcodePlater):
+                window.Show()
+                window.Raise()
+                return
         self.log(_("G-Code plate function activated"))
         gcplater.GcodePlater(size = (800, 580), callback = self.platecb,
-                           parent = self,
-                           build_dimensions = self.build_dimensions_list,
-                           circular_platform = self.settings.circular_bed,
-                           antialias_samples = int(self.settings.antialias3dsamples)).Show()
+                             parent = self,
+                             build_dimensions = self.build_dimensions_list,
+                             circular_platform = self.settings.circular_bed,
+                             antialias_samples = int(self.settings.antialias3dsamples)).Show()
 
     def platecb(self, name):
         self.log(_("Plated %s") % name)
@@ -887,6 +898,11 @@ class PronterWindow(MainWindow, pronsole.pronsole):
 
     def project(self, event):
         """Start Projector tool"""
+        for window in self.GetChildren():
+            if isinstance(window, projectlayer.SettingsFrame):
+                window.Show()
+                window.Raise()
+                return
         projectlayer.SettingsFrame(self, self.p).Show()
 
     def exclude(self, event):
@@ -901,6 +917,11 @@ class PronterWindow(MainWindow, pronsole.pronsole):
 
     def show_spool_manager(self, event):
         """Show Spool Manager Window"""
+        for window in self.GetChildren():
+            if isinstance(window, spoolmanager_gui.SpoolManagerMainWindow):
+                window.Show()
+                window.Raise()
+                return
         spoolmanager_gui.SpoolManagerMainWindow(self, self.spool_manager).Show()
 
     def system_info(self, event):
