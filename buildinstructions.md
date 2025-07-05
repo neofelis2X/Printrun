@@ -1,8 +1,9 @@
 # Build instructions
 In general please follow the build instructions as described in [README.md](README.md). Here you will find a brief overview about what is needed to build your own development environment without further explanations.
-## Setup on OS X
+
+## Setup on macOS
 ### Prerequisites
-* install python 3.10
+* install supported python version (see [README.md](README.md))
 * install python extension compile environment, this is automatically done if you have xcode
 * install git
 ### Clone the repository
@@ -13,8 +14,8 @@ git pull
 ```
 ### Install and activate the virtual environment
 ```
-python3 -m venv v3
-. ./v3/bin/activate
+python3 -m venv venv
+. ./venv/bin/activate
 ```
 ### Install and update all required libraries
 ```
@@ -29,26 +30,11 @@ python setup.py build_ext --inplace
 `python pronterface.py`
 
 ### For packaging
-```
-pip install pyinstaller
-pyi-makespec -F -n "Pronterface" --add-data "printrun/assets:printrun/assets" -w -i "./assets_raw/icons/pronterface.icns" pronterface.py
-rm -rf dist
-sed -i '' '$ s/.$//' Pronterface.spec
-cat >> Pronterface.spec <<EOL
-info_plist={
-    'NSPrincipalClass': 'NSApplication',
-    'NSAppleScriptEnabled': False,
-    'NSAppSleepDisabled': True,
-  },
-)
-EOL
-pyinstaller --clean Pronterface.spec -y
-(optional) codesign -s identityname dist/Pronterface.app --deep
-```
+Please find further informations about building a development environment and packaging in the script [release_macos.sh](release_macos.sh) where we implemented an automated build for macOS.
 
 ## Setup on Windows
 ### Prerequisites
-* install python 3.10
+* install supported python version (see [README.md](README.md))
 * install python extension compile environment, see https://wiki.python.org/moin/WindowsCompilers
 * install git
 ### Clone the repository
@@ -79,14 +65,7 @@ Please see remark for polygon3[^1]
 `python pronterface.py`
 
 ### For packaging
-```
-pip install pyinstaller
-pyi-makespec -F -n "Pronterface" --add-data "printrun/assets;printrun/assets" -w -i "./assets_raw/icons/pronterface.ico" pronterface.py
-pyinstaller --clean Pronterface.spec -y
-```
-
-> [!TIP]
-> Please find further informations about building a development environment and packaging in script [release_windows.bat](release_windows.bat) where we implemented an automated build for windows.
+Please find further informations about building a development environment and packaging in the script [release_windows.bat](release_windows.bat) where we implemented an automated build for windows.
 
 ### Remark:
 
