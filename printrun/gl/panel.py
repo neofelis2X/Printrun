@@ -369,13 +369,14 @@ class wxGLPanel(BASE_CLASS):
         glClearColor(*self.color_background)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
-        self.platform.draw()
+
 
         if self.canvas.HasFocus():
             self.focus.draw()
 
         self.draw_objects()
 
+        self.platform.draw()
         self.canvas.SwapBuffers()
 
         if self.show_frametime:
