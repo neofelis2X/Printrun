@@ -178,7 +178,7 @@ class Camera():
         Takes the bounding sphere of a model (center, radius) and zooms / moves
         the current view so that the view focues on the model.
         """
-        forward = self.target - self.eye
+        forward = self._target - self._eye
         uforward = forward / vec_length(forward)
         aspect = self.width / self.height
 
@@ -187,8 +187,8 @@ class Camera():
             half_min_fov_rad = np.atan(aspect * np.tan(half_min_fov_rad))
 
         distance_to_center = bounding_sphere[1] / np.sin(half_min_fov_rad)
-        self.target = bounding_sphere[0]
-        self.eye = self.target - uforward * distance_to_center
+        self._target = bounding_sphere[0]
+        self._eye = self._target - uforward * distance_to_center
 
         if self.is_orthographic:
             if aspect < 1.0:
@@ -198,7 +198,7 @@ class Camera():
 
             dolly_constant = 0.95 * self.display_ppi_factor
             self.dolly_factor = 2 * bounding_sphere[1] / min_side * dolly_constant
-            self.create_projection_matrix()
+            self._rebuild_proj_mat()
 
         self._rebuild_view_mat()
 
