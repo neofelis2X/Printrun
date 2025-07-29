@@ -920,14 +920,17 @@ class GcodeModel(Model):
 
         # Max number of values which can be generated per gline
         # to store coordinates/colors/normals.
-        # Nicely enough we have 3 per kind of thing for all kinds.
-        coordspervertex = 3
-        buffered_color_len = 4  # alpha is the 4th color component
-        verticesperline = 8
+        coordspervertex = 3  # xyz components
+        buffered_color_len = 4  # rgba components
+        verticesperline = 2 * 4  # each end of the line has 4 vertices
         coordsperline = coordspervertex * verticesperline
+        color_channels_per_line = buffered_color_len * verticesperline
 
         def coords_count(line_count: int) -> int:
             return line_count * coordsperline
+
+        def colorchannels_count(line_count: int) -> int:
+            return line_count * color_channels_per_line
 
         travelverticesperline = 2
         travelcoordsperline = coordspervertex * travelverticesperline
@@ -950,13 +953,14 @@ class GcodeModel(Model):
 
         ntravelcoords = travel_coords_count(nlines)
         ncoords = coords_count(nlines)
+        ncolchannels = colorchannels_count(nlines)
         nindices = indices_count(nlines)
 
         travel_vertices = self.travels = np.zeros(ntravelcoords, dtype = GLfloat)
         travel_vertex_k = 0
         vertices = self.vertices = np.zeros(ncoords, dtype = GLfloat)
         vertex_k = 0
-        colors = self.colors = np.zeros(ncoords, dtype = GLfloat)
+        colors = self.colors = np.zeros(ncolchannels, dtype = GLfloat)
 
         color_k = 0
         normals = self.normals = np.zeros(ncoords, dtype = GLfloat)
@@ -986,11 +990,12 @@ class GcodeModel(Model):
                 # for everything
                 ntravelcoords = travel_coords_count(remaining_lines) + travel_vertex_k
                 ncoords = coords_count(remaining_lines) + vertex_k
+                ncolchannels = colorchannels_count(remaining_lines) + color_k
                 nindices = indices_count(remaining_lines) + index_k
                 if ncoords > vertices.size:
                     self.travels.resize(ntravelcoords, refcheck = False)
                     self.vertices.resize(ncoords, refcheck = False)
-                    self.colors.resize(ncoords, refcheck = False)
+                    self.colors.resize(ncolchannels, refcheck = False)
                     self.normals.resize(ncoords, refcheck = False)
                     self.indices.resize(nindices, refcheck = False)
                 layer = model_data.all_layers[layer_idx]
@@ -1137,6 +1142,7 @@ class GcodeModel(Model):
                                 # arc interpolation extra points allocation
                                 ratio = (index_k + len(new_indices) +
                                          100 * indicesperline) / self.indices.size * 1.5
+                                #FIXME: Check this, is ratio a factor that is also correct for the colour?
                                 logging.debug(_("GL: Reallocate GCode print buffer %d -> %d") % \
                                               (self.vertices.size, int(self.vertices.size * ratio)))
                                 self.vertices.resize(int(self.vertices.size * ratio),
@@ -1241,7 +1247,7 @@ class GcodeModel(Model):
     def update_colors(self) -> None:
         """Rebuild gl color buffer without loading. Used after color settings edit"""
         ncoords = self.count_print_vertices[-1]
-        colors = np.empty(ncoords * 3, dtype = GLfloat)
+        colors = np.empty(ncoords * 3, dtype = GLfloat)  #FIXME: 4 or 3 coordintes / channels ?
         cur_vertex = 0
         gline_i = 1
         for gline in self.gcode.lines:
@@ -1252,10 +1258,11 @@ class GcodeModel(Model):
                 while cur_vertex < last_vertex:
                     colors[cur_vertex * 3 : cur_vertex * 3 + 3] = gline_color
                     cur_vertex += 1
-        if self.vertex_color_buffer:
-            pass
+        #if self.colors:
+        #    pass
             #self.vertex_color_buffer.delete()
         # TODO: Find a solution to update the colors
+
         #self.vertex_color_buffer = numpy2vbo(colors)
 
     # ------------------------------------------------------------------------
@@ -1267,19 +1274,21 @@ class GcodeModel(Model):
         self.ubo = ubo
         self._modelmatrix = mat4_translation(self.offset_x, self.offset_y, 0.0)
 
+        # TODO: FIX partly loading of files (does not update to final model)
         with self.lock:
             self.layers_loaded = self.max_layers
             self.initialized = True
-            if self.buffers_created:
-                # FIXME: fill buffer wit current data
+            if not self.buffers_created:
+                self.vao, self.vbo, self.ebo = renderer.create_buffers()
+                self.buffers_created = True
+                # FIXME: fill buffer with current data
+
                 #self.travel_buffer.delete()
                 #self.index_buffer.delete()
                 #self.vertex_buffer.delete()
                 #self.vertex_color_buffer.delete()
                 #self.vertex_normal_buffer.delete()
-                return
 
-            self.vao, self.vbo, self.ebo = renderer.create_buffers()
             vb = renderer.interleave_vertex_data(self.vertices.reshape(-1, 3),
                                                  self.colors.reshape(-1, 4),
                                                  self.normals.reshape(-1, 3),
@@ -1303,7 +1312,6 @@ class GcodeModel(Model):
                 self.vertices = np.zeros(0, dtype = GLfloat)
                 self.colors = np.zeros(0, dtype = GLfloat)
                 self.normals = np.zeros(0, dtype = GLfloat)
-            self.buffers_created = True
 
     def draw(self) -> None:
         glBindVertexArray(self.vao)
@@ -1440,10 +1448,12 @@ class GcodeModelLight(Model):
 
         prev_pos = (0, 0, 0)
         layer_idx = 0
+        coord_per_line = 2 * 3  # 2x vertex with xyz coordinates
+        channels_per_line = 2 * 4  # 2x vertex with rgba color
         nlines = len(model_data)
-        vertices = self.vertices = np.zeros(nlines * 6, dtype = GLfloat)
+        vertices = self.vertices = np.zeros(nlines * coord_per_line, dtype = GLfloat)
         vertex_k = 0
-        colors = self.colors = np.zeros(nlines * 8, dtype = GLfloat)
+        colors = self.colors = np.zeros(nlines * channels_per_line, dtype = GLfloat)
         color_k = 0
         self.printed_until = -1
         self.only_current = False
@@ -1451,9 +1461,9 @@ class GcodeModelLight(Model):
         while layer_idx < len(model_data.all_layers):
             with self.lock:
                 nlines = len(model_data)
-                if nlines * 6 > vertices.size:
-                    self.vertices.resize(nlines * 6, refcheck = False)
-                    self.colors.resize(nlines * 8, refcheck = False)
+                if nlines * coord_per_line > vertices.size:
+                    self.vertices.resize(nlines * coord_per_line, refcheck = False)
+                    self.colors.resize(nlines * channels_per_line, refcheck = False)
                 layer = model_data.all_layers[layer_idx]
                 has_movement = False
                 for gline in layer:
@@ -1465,13 +1475,15 @@ class GcodeModelLight(Model):
                     has_movement = True
                     for (current_pos, interpolated) in interpolate_arcs(gline, prev_gline):
 
-                        if self.vertices.size < (vertex_k + 100 * 6):
+                        if self.vertices.size < (vertex_k + 100 * coord_per_line):
                             # arc interpolation extra points allocation
-                            ratio = (vertex_k + 100 * 6) / self.vertices.size * 1.5
-                            logging.debug(_("GL: Reallocate GCode lite buffer %d -> %d") % \
-                                          (self.vertices.size, int(self.vertices.size * ratio)))
+
+                            ratio = (vertex_k + 100 * coord_per_line) / self.vertices.size * 1.5
                             self.vertices.resize(int(self.vertices.size * ratio), refcheck = False)
                             self.colors.resize(int(self.colors.size * ratio), refcheck = False)
+
+                            logging.debug(_("GL: Reallocate GCode lite buffer %d -> %d") % \
+                                          (self.vertices.size, int(self.vertices.size * ratio)))
 
                         vertices[vertex_k] = prev_pos[0]
                         vertices[vertex_k + 1] = prev_pos[1]
@@ -1479,7 +1491,7 @@ class GcodeModelLight(Model):
                         vertices[vertex_k + 3] = current_pos[0]
                         vertices[vertex_k + 4] = current_pos[1]
                         vertices[vertex_k + 5] = current_pos[2]
-                        vertex_k += 6
+                        vertex_k += coord_per_line
 
                         vertex_color = self.movement_color(gline)
                         colors[color_k] = vertex_color[0]
@@ -1490,7 +1502,7 @@ class GcodeModelLight(Model):
                         colors[color_k + 5] = vertex_color[1]
                         colors[color_k + 6] = vertex_color[2]
                         colors[color_k + 7] = vertex_color[3]
-                        color_k += 8
+                        color_k += channels_per_line
 
                         prev_pos = current_pos
                         prev_gline = gline
@@ -1556,15 +1568,12 @@ class GcodeModelLight(Model):
         with self.lock:
             self.layers_loaded = self.max_layers
             self.initialized = True
-            if self.buffers_created:
-                vb = renderer.interleave_vertex_data(self.vertices.reshape(-1, 3),
-                                                 self.colors.reshape(-1, 4),
-                                                 distinct_colors=True)
-                renderer.fill_buffer(self.vbo, vb, GL_ARRAY_BUFFER)
+            if not self.buffers_created:
+                self.vao, self.vbo, _ = renderer.create_buffers(create_ebo=False,
+                                                                lines_only=True)
+                self.buffers_created = True
 
             # TODO: Indexed data would be nice to have?
-            self.vao, self.vbo, _ = renderer.create_buffers(create_ebo=False,
-                                                            lines_only=True)
             vb = renderer.interleave_vertex_data(self.vertices.reshape(-1, 3),
                                                  self.colors.reshape(-1, 4),
                                                  distinct_colors=True)
@@ -1575,7 +1584,6 @@ class GcodeModelLight(Model):
                 self.vertices = np.zeros(0, dtype=GLfloat)
                 self.colors = np.zeros(0, dtype=GLfloat)
 
-            self.buffers_created = True
 
     def draw(self) -> None:
         renderer.update_ubo_transform(self.ubo, self.modelmatrix)
