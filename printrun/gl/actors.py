@@ -170,9 +170,15 @@ class Platform(ActorBaseClass):
         else:
             base_color = self.COLOR_LIGHT  # Bright lines
 
-        self.color_minor = blend_colors(bg_color, base_color, 0.1)
-        self.color_interm = blend_colors(bg_color, base_color, 0.2)
-        self.color_major = blend_colors(bg_color, base_color, 0.33)
+        self.color_minor = (*base_color, 0.1)
+        self.color_interm = (*base_color, 0.2)
+        self.color_major = (*base_color, 0.33)
+
+        # This blends the grid colors with the background color into a
+        # solid color without alpha. Current solution bares better results.
+        # self.color_minor = blend_colors(bg_color, base_color, 0.1)
+        # self.color_interm = blend_colors(bg_color, base_color, 0.2)
+        # self.color_major = blend_colors(bg_color, base_color, 0.33)
 
         self._initialise_data()
 
@@ -1263,8 +1269,6 @@ class GcodeModel(Model):
             #self.vertex_color_buffer.delete()
         # TODO: Find a solution to update the colors
 
-        #self.vertex_color_buffer = numpy2vbo(colors)
-
     # ------------------------------------------------------------------------
     # DRAWING
     # ------------------------------------------------------------------------
@@ -1288,6 +1292,13 @@ class GcodeModel(Model):
                 #self.vertex_buffer.delete()
                 #self.vertex_color_buffer.delete()
                 #self.vertex_normal_buffer.delete()
+            else:
+                glBindVertexArray(self.vao)
+
+            # TODO:
+            # Create Buffer big enough for the whole model (size known?)
+            # Fill data incremental, use offsets
+            # When all model data loaded, add travel data
 
             vb = renderer.interleave_vertex_data(self.vertices.reshape(-1, 3),
                                                  self.colors.reshape(-1, 4),
@@ -1572,6 +1583,8 @@ class GcodeModelLight(Model):
                 self.vao, self.vbo, _ = renderer.create_buffers(create_ebo=False,
                                                                 lines_only=True)
                 self.buffers_created = True
+            else:
+                glBindVertexArray(self.vao)
 
             # TODO: Indexed data would be nice to have?
             vb = renderer.interleave_vertex_data(self.vertices.reshape(-1, 3),
