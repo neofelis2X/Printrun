@@ -883,8 +883,8 @@ class GcodeModel(Model):
     color_printed = (0.2, 0.75, 0.0, 1.0)
     color_current = (0.0, 0.9, 1.0, 1.0)
     color_current_printed = (0.1, 0.4, 0, 1.0)
-    color_current_travel =  (0.8, 0.0, 1.0, 1.0)
     # TODO: Add this color to settings
+    color_current_travel =  (0.8, 0.0, 1.0, 1.0)
 
     display_travels = True
 
@@ -901,9 +901,8 @@ class GcodeModel(Model):
         self.count_print_indices = [0]
         self.count_print_vertices = [0]
 
-        self.normals = np.zeros(0, dtype = GLfloat)
-        self.indices = np.zeros(0, dtype = GLuint)
         self.travels = np.zeros(0, dtype = GLfloat)
+        self.indices = np.zeros(0, dtype = GLuint)
         self.travels_offset = 0
 
     def set_path_size(self, path_halfwidth: float, path_halfheight: float) -> None:
@@ -928,21 +927,17 @@ class GcodeModel(Model):
         # to store coordinates/colors/normals.
         coordspervertex = 3  # xyz components
         buffered_color_len = 4  # rgba components
+        # xyz position + rgba color + xyz normal vector per vertex
+        bufferlen_per_vertex = 2 * coordspervertex + buffered_color_len
         verticesperline = 2 * 4  # each end of the line has 4 vertices
-        coordsperline = coordspervertex * verticesperline
-        color_channels_per_line = buffered_color_len * verticesperline
 
         def coords_count(line_count: int) -> int:
-            return line_count * coordsperline
-
-        def colorchannels_count(line_count: int) -> int:
-            return line_count * color_channels_per_line
-
-        travelverticesperline = 2
-        travelcoordsperline = coordspervertex * travelverticesperline
+            return line_count * verticesperline * bufferlen_per_vertex
 
         def travel_coords_count(line_count: int) -> int:
-            return line_count * travelcoordsperline
+            travelverticesperline = 2
+            # Normals are included to keep the memory layout the same
+            return line_count * travelverticesperline * bufferlen_per_vertex
 
         trianglesperface = 2
         facesperbox = 4
@@ -957,20 +952,16 @@ class GcodeModel(Model):
 
         nlines = len(model_data)
 
-        ntravelcoords = travel_coords_count(nlines)
         ncoords = coords_count(nlines)
-        ncolchannels = colorchannels_count(nlines)
+        ntravelcoords = travel_coords_count(nlines)
+        travel_attributes = np.array((*self.color_travel, 0.0, 0.0, 1.0))
         nindices = indices_count(nlines)
 
-        travel_vertices = self.travels = np.zeros(ntravelcoords, dtype = GLfloat)
-        travel_vertex_k = 0
         vertices = self.vertices = np.zeros(ncoords, dtype = GLfloat)
-        vertex_k = 0
-        colors = self.colors = np.zeros(ncolchannels, dtype = GLfloat)
-
-        color_k = 0
-        normals = self.normals = np.zeros(ncoords, dtype = GLfloat)
+        travel_vertices = self.travels = np.zeros(ntravelcoords, dtype = GLfloat)
         indices = self.indices = np.zeros(nindices, dtype = GLuint)
+        vertex_k = 0  # amount of loaded vertices, one vertex has multiple vertex attributes
+        travel_vertex_k = 0
         index_k = 0
         self.layer_idxs_map = {}
         self.layer_stops = [0]
@@ -994,15 +985,12 @@ class GcodeModel(Model):
                 remaining_lines = nlines - processed_lines
                 # Only reallocate memory which might be needed, not memory
                 # for everything
-                ntravelcoords = travel_coords_count(remaining_lines) + travel_vertex_k
-                ncoords = coords_count(remaining_lines) + vertex_k
-                ncolchannels = colorchannels_count(remaining_lines) + color_k
+                ncoords = coords_count(remaining_lines) + vertex_k * bufferlen_per_vertex
+                ntravelcoords = travel_coords_count(remaining_lines) + travel_vertex_k * bufferlen_per_vertex
                 nindices = indices_count(remaining_lines) + index_k
                 if ncoords > vertices.size:
-                    self.travels.resize(ntravelcoords, refcheck = False)
                     self.vertices.resize(ncoords, refcheck = False)
-                    self.colors.resize(ncolchannels, refcheck = False)
-                    self.normals.resize(ncoords, refcheck = False)
+                    self.travels.resize(ntravelcoords, refcheck = False)
                     self.indices.resize(nindices, refcheck = False)
                 layer = model_data.all_layers[layer_idx]
                 has_movement = False
@@ -1016,19 +1004,21 @@ class GcodeModel(Model):
                     has_movement = True
                     for (current_pos, interpolated) in interpolate_arcs(gline, prev_gline):
                         if not gline.extruding:
-                            if self.travels.size < (travel_vertex_k + 100 * 6):
+                            if self.travels.size < (travel_vertex_k * bufferlen_per_vertex + 2 * bufferlen_per_vertex):
                                 # arc interpolation extra points allocation
-                                # if not enough room for another 100 points now,
-                                # allocate enough and 50% extra to minimize separate allocations
-                                ratio = (travel_vertex_k + 100 * 6) / self.travels.size * 1.5
+                                # if the array is full, extend its size by +50%
                                 logging.debug(_("GL: Reallocate GCode travel buffer %d -> %d") % \
-                                              (self.travels.size, int(self.travels.size * ratio)))
-                                self.travels.resize(int(self.travels.size * ratio),
+                                              (self.travels.size, int(self.travels.size * 1.5)))
+
+                                self.travels.resize(int(self.travels.size * 1.5),
                                                     refcheck = False)
 
-                            travel_vertices[travel_vertex_k : travel_vertex_k+3] = prev_pos
-                            travel_vertices[travel_vertex_k + 3 : travel_vertex_k + 6] = current_pos
-                            travel_vertex_k += 6
+                            buff_idx = travel_vertex_k * bufferlen_per_vertex
+                            travel_vertices[buff_idx : buff_idx + 3] = prev_pos
+                            travel_vertices[buff_idx + 3 : buff_idx + 10] = travel_attributes
+                            travel_vertices[buff_idx + 10 : buff_idx + 13] = current_pos
+                            travel_vertices[buff_idx + 13 : buff_idx + 20] = travel_attributes
+                            travel_vertex_k += 2
                         else:
                             delta_x = current_pos[0] - prev_pos[0]
                             delta_y = current_pos[1] - prev_pos[1]
@@ -1062,14 +1052,14 @@ class GcodeModel(Model):
                                 new_verts.extend((p1x, p1y, pos[2]))
                                 new_verts.extend((pos[0], pos[1], pos[2] - path_hh))
                                 new_verts.extend((p2x, p2y, pos[2]))
-                                new_norms.extend((0, 0, 1))
-                                new_norms.extend((-move_x, -move_y, 0))
-                                new_norms.extend((0, 0, -1))
-                                new_norms.extend((move_x, move_y, 0))
+                                new_norms.extend((0.0, 0.0, 1.0))
+                                new_norms.extend((-move_x, -move_y, 0.0))
+                                new_norms.extend((0.0, 0.0, -1.0))
+                                new_norms.extend((move_x, move_y, 0.0))
 
                             if prev_gline and prev_gline.extruding or prev_extruding:
                                 # Store previous vertices indices
-                                prev_id = vertex_k // 3 - 4
+                                prev_id = vertex_k - 4
                                 avg_move_normal_x = (prev_move_normal_x + move_normal_x) / 2
                                 avg_move_normal_y = (prev_move_normal_y + move_normal_y) / 2
                                 norm = avg_move_normal_x * avg_move_normal_x + \
@@ -1089,7 +1079,7 @@ class GcodeModel(Model):
                                 if fact < 0.5:
                                     compute_vertices(prev_move_normal_x, prev_move_normal_y,
                                                      new_vertices, new_normals)
-                                    first = vertex_k // 3
+                                    first = vertex_k
                                     # Link to previous
                                     new_indices += triangulate_box(prev_id, prev_id + 1,
                                                                 prev_id + 2, prev_id + 3,
@@ -1109,7 +1099,7 @@ class GcodeModel(Model):
                                     # Compute vertices
                                     compute_vertices(avg_move_normal_x, avg_move_normal_y,
                                                      new_vertices, new_normals, divisor = fact)
-                                    first = vertex_k // 3
+                                    first = vertex_k
                                     # Link to previous
                                     new_indices += triangulate_box(prev_id, prev_id + 1,
                                                                 prev_id + 2, prev_id + 3,
@@ -1119,7 +1109,7 @@ class GcodeModel(Model):
                                 # Compute vertices normal to the current move and cap it
                                 compute_vertices(move_normal_x, move_normal_y,
                                                  new_vertices, new_normals)
-                                first = vertex_k // 3
+                                first = vertex_k
                                 new_indices = triangulate_rectangle(first, first + 1,
                                                                     first + 2, first + 3)
 
@@ -1129,7 +1119,7 @@ class GcodeModel(Model):
                                 # Compute caps and link everything
                                 compute_vertices(move_normal_x, move_normal_y,
                                                  new_vertices, new_normals, pos = current_pos)
-                                end_first = vertex_k // 3 + len(new_vertices) // 3 - 4
+                                end_first = vertex_k + len(new_vertices) // 3 - 4
 
                                 new_indices += triangulate_rectangle(end_first + 3,
                                                                      end_first + 2,
@@ -1148,15 +1138,12 @@ class GcodeModel(Model):
                                 # arc interpolation extra points allocation
                                 ratio = (index_k + len(new_indices) +
                                          100 * indicesperline) / self.indices.size * 1.5
-                                #FIXME: Check this, is ratio a factor that is also correct for the colour?
+
                                 logging.debug(_("GL: Reallocate GCode print buffer %d -> %d") % \
                                               (self.vertices.size, int(self.vertices.size * ratio)))
+
                                 self.vertices.resize(int(self.vertices.size * ratio),
                                                      refcheck = False)
-                                self.colors.resize(int(self.colors.size * ratio),
-                                                   refcheck = False)
-                                self.normals.resize(int(self.normals.size * ratio),
-                                                    refcheck = False)
                                 self.indices.resize(int(self.indices.size * ratio),
                                                     refcheck = False)
 
@@ -1165,17 +1152,16 @@ class GcodeModel(Model):
                             index_k += len(new_indices)
 
                             new_vertices_len = len(new_vertices)
-                            vertices[vertex_k : vertex_k + new_vertices_len] = new_vertices
-                            normals[vertex_k : vertex_k + new_vertices_len] = new_normals
-                            vertex_k += new_vertices_len
-
-                            new_vertices_count = new_vertices_len // coordspervertex
-                            # alpha (transparency) is included here
                             gline_color = self.movement_color(gline)[:buffered_color_len]
-                            for vi in range(new_vertices_count):
-                                colors[color_k : color_k + buffered_color_len] = gline_color
-                                color_k += buffered_color_len
 
+                            buff_idx = vertex_k * bufferlen_per_vertex
+                            for i in range(0, new_vertices_len, 3):
+                                vertices[buff_idx : buff_idx + 3] = new_vertices[i : i + 3]
+                                vertices[buff_idx + 3 : buff_idx + 7] = gline_color
+                                vertices[buff_idx + 7 : buff_idx + 10] = new_normals[i : i + 3]
+                                buff_idx += bufferlen_per_vertex
+
+                            vertex_k += new_vertices_len // 3
                             prev_move_normal_x = move_normal_x
                             prev_move_normal_y = move_normal_y
                             prev_move_angle = move_angle
@@ -1185,9 +1171,9 @@ class GcodeModel(Model):
 
                     prev_gline = gline
                     prev_extruding = gline.extruding
-                    count_travel_indices.append(travel_vertex_k // 3)
                     count_print_indices.append(index_k)
-                    count_print_vertices.append(vertex_k // 3)
+                    count_print_vertices.append(vertex_k)
+                    count_travel_indices.append(travel_vertex_k)
                     gline.gcview_end_vertex = len(count_print_indices) - 1
 
                 if has_movement:
@@ -1211,10 +1197,8 @@ class GcodeModel(Model):
                          (model_data.ymin, model_data.ymax, model_data.depth),
                          (model_data.zmin, model_data.zmax, model_data.height))
 
-            self.travels.resize(travel_vertex_k, refcheck = False)
-            self.vertices.resize(vertex_k, refcheck = False)
-            self.colors.resize(color_k, refcheck = False)
-            self.normals.resize(vertex_k, refcheck = False)
+            self.vertices.resize(vertex_k * bufferlen_per_vertex, refcheck = False)
+            self.travels.resize(travel_vertex_k * bufferlen_per_vertex, refcheck = False)
             self.indices.resize(index_k, refcheck = False)
 
             self.layer_stops = array.array('L', self.layer_stops)
@@ -1224,7 +1208,6 @@ class GcodeModel(Model):
 
             self.max_layers = len(self.layer_stops) - 1
             self.num_layers_to_draw = self.max_layers + 1
-            self.loaded = True
             self.initialized = False
             self.loaded = True
             self.fully_loaded = True
@@ -1232,12 +1215,12 @@ class GcodeModel(Model):
         t_end = time.time()
 
         logging.debug(_('GL: Initialized GCode model in %.2f seconds') % (t_end - t_start))
-        logging.debug(_('GL: GCode model vertex count: %d') % ((len(self.vertices) + len(self.travels)) // 3))
+        logging.debug(_('GL: GCode model vertex count: %d') % ((len(self.vertices) + len(self.travels)) // 10))
         yield None
 
     def copy(self) -> 'GcodeModel':
         copy = GcodeModel()
-        for var in ["vertices", "colors", "travels", "indices", "normals",
+        for var in ["vertices", "travels", "indices",
                     "max_layers", "num_layers_to_draw", "printed_until",
                     "layer_stops", "dims", "only_current",
                     "layer_idxs_map", "count_travel_indices",
@@ -1253,7 +1236,7 @@ class GcodeModel(Model):
     def update_colors(self) -> None:
         """Rebuild gl color buffer without loading. Used after color settings edit"""
         ncoords = self.count_print_vertices[-1]
-        colors = np.empty(ncoords * 3, dtype = GLfloat)  #FIXME: 4 or 3 coordintes / channels ?
+        colors = np.empty(ncoords * 4, dtype = GLfloat)
         cur_vertex = 0
         gline_i = 1
         for gline in self.gcode.lines:
@@ -1278,20 +1261,13 @@ class GcodeModel(Model):
         self.ubo = ubo
         self._modelmatrix = mat4_translation(self.offset_x, self.offset_y, 0.0)
 
-        # TODO: FIX partly loading of files (does not update to final model)
         with self.lock:
             self.layers_loaded = self.max_layers
             self.initialized = True
             if not self.buffers_created:
                 self.vao, self.vbo, self.ebo = renderer.create_buffers()
                 self.buffers_created = True
-                # FIXME: fill buffer with current data
 
-                #self.travel_buffer.delete()
-                #self.index_buffer.delete()
-                #self.vertex_buffer.delete()
-                #self.vertex_color_buffer.delete()
-                #self.vertex_normal_buffer.delete()
             else:
                 glBindVertexArray(self.vao)
 
@@ -1300,35 +1276,24 @@ class GcodeModel(Model):
             # Fill data incremental, use offsets
             # When all model data loaded, add travel data
 
-            vb = renderer.interleave_vertex_data(self.vertices.reshape(-1, 3),
-                                                 self.colors.reshape(-1, 4),
-                                                 self.normals.reshape(-1, 3),
-                                                 distinct_colors=True,
-                                                 distinct_normals=True)
-
-            normal = np.array((0.0, 0.0, 1.0))
-            vb_travels = renderer.interleave_vertex_data(self.travels.reshape(-1, 3),
-                                                         self.color_travel,
-                                                         normal)
-            self.travels_offset = vb.size // 10
-            vb_all = np.concatenate((vb, vb_travels))
+            self.travels_offset = self.vertices.size // 10
+            vb_all = np.concatenate((self.vertices, self.travels))
 
             renderer.fill_buffer(self.vbo, vb_all, GL_ARRAY_BUFFER)
             renderer.fill_buffer(self.ebo, self.indices.data, GL_ELEMENT_ARRAY_BUFFER)
 
             if self.fully_loaded:
                 # Delete numpy arrays after creating VBOs after full load
+                self.vertices = np.zeros(0, dtype = GLfloat)
                 self.travels = np.zeros(0, dtype = GLfloat)
                 self.indices = np.zeros(0, dtype = GLuint)
-                self.vertices = np.zeros(0, dtype = GLfloat)
-                self.colors = np.zeros(0, dtype = GLfloat)
-                self.normals = np.zeros(0, dtype = GLfloat)
 
     def draw(self) -> None:
         glBindVertexArray(self.vao)
         renderer.update_ubo_transform(self.ubo, self.modelmatrix)
         with self.lock:
 
+            #self.display_travels = False
             if self.display_travels:
                 self.shaderlist["lines"].use()
                 self._display_travels()
