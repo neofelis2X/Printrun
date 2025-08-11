@@ -1292,14 +1292,12 @@ class GcodeModel(Model):
         glBindVertexArray(self.vao)
         renderer.update_ubo_transform(self.ubo, self.modelmatrix)
         with self.lock:
+            self.shaderlist["basic"].use()
+            self._display_movements()
 
-            #self.display_travels = False
             if self.display_travels:
                 self.shaderlist["lines"].use()
                 self._display_travels()
-
-            self.shaderlist["basic"].use()
-            self._display_movements()
 
     def _display_travels(self) -> None:
         sid = self.shaderlist["lines"].id
@@ -1309,7 +1307,7 @@ class GcodeModel(Model):
         end_index = self.count_travel_indices[end]
 
         # Draw current layer travels
-        if self.num_layers_to_draw < max_layers:
+        if self.num_layers_to_draw <= max_layers:
             end_prev_layer = self.layer_stops[self.num_layers_to_draw - 1]
             start_index = self.count_travel_indices[end_prev_layer + 1]
 
@@ -1394,7 +1392,7 @@ class GcodeModel(Model):
 
 class GcodeModelLight(Model):
     """
-    Model for displaying Gcode data.
+    Model for displaying Gcode data as lines.
     """
 
     color_travel =  (0.8, 0.8, 0.8, 1.0)
@@ -1406,6 +1404,10 @@ class GcodeModelLight(Model):
     color_printed = (0.15, 0.65, 0.0, 1.0)
     color_current = (0.0, 0.9, 1.0, 1.0)
     color_current_printed = (0.1, 0.4, 0.0, 1.0)
+    # TODO: Add this color to settings
+    color_current_travel =  (0.8, 0.0, 1.0, 1.0)
+
+    display_travels = True
 
     buffers_created = False
     loaded = False
@@ -1414,32 +1416,50 @@ class GcodeModelLight(Model):
     def __init__(self):
         super().__init__()
 
+        self.travels = np.zeros(0, dtype = GLfloat)
+        self.indices = np.zeros(0, dtype = GLuint)
+        self.travel_index_offset = 0
+
     def load_data(self, model_data: gcoder.GCode,
                   callback = None) -> Iterator[Union[int, None]]:
         t_start = time.time()
         self.gcode = model_data
 
+        coords_per_vertex = 3  # xyz
+        channels_per_color = 4  # rgba
+        bufferlen_per_vertex = coords_per_vertex + channels_per_color
+        vertices_per_line = 2
+        bufferlen_per_line = vertices_per_line * bufferlen_per_vertex
+        nlines = len(model_data)
+
+        vertices = self.vertices = np.zeros(nlines * bufferlen_per_line,
+                                            dtype = GLfloat)
+        indices = self.indices = np.zeros(nlines * vertices_per_line,
+                                          dtype = GLuint)
+        travel_indices = self.travels = []
+        vertex_k = 0
+        index_k = 0
+        travel_index_k = 0
         self.layer_idxs_map = {}
         self.layer_stops = [0]
+        self.layer_stops_travels = [0]
 
-        prev_pos = (0, 0, 0)
-        layer_idx = 0
-        coord_per_line = 2 * 3  # 2x vertex with xyz coordinates
-        channels_per_line = 2 * 4  # 2x vertex with rgba color
-        nlines = len(model_data)
-        vertices = self.vertices = np.zeros(nlines * coord_per_line, dtype = GLfloat)
-        vertex_k = 0
-        colors = self.colors = np.zeros(nlines * channels_per_line, dtype = GLfloat)
-        color_k = 0
         self.printed_until = -1
         self.only_current = False
+
         prev_gline = None
+        prev_pos = (0.0, 0.0, 0.0)
+        prev_col = (0.0, 0.0, 0.0, 0.0)
+        layer_idx = 0
+
         while layer_idx < len(model_data.all_layers):
             with self.lock:
                 nlines = len(model_data)
-                if nlines * coord_per_line > vertices.size:
-                    self.vertices.resize(nlines * coord_per_line, refcheck = False)
-                    self.colors.resize(nlines * channels_per_line, refcheck = False)
+                if nlines * vertices_per_line > indices.size:
+                    self.vertices.resize(nlines * bufferlen_per_line,
+                                         refcheck = False)
+                    self.indices.resize(nlines * vertices_per_line,
+                                         refcheck = False)
                 layer = model_data.all_layers[layer_idx]
                 has_movement = False
                 for gline in layer:
@@ -1451,41 +1471,51 @@ class GcodeModelLight(Model):
                     has_movement = True
                     for (current_pos, interpolated) in interpolate_arcs(gline, prev_gline):
 
-                        if self.vertices.size < (vertex_k + 100 * coord_per_line):
+                        if self.indices.size < (index_k * vertices_per_line + 2 * vertices_per_line):
                             # arc interpolation extra points allocation
-
-                            ratio = (vertex_k + 100 * coord_per_line) / self.vertices.size * 1.5
-                            self.vertices.resize(int(self.vertices.size * ratio), refcheck = False)
-                            self.colors.resize(int(self.colors.size * ratio), refcheck = False)
-
+                            # if the array is full, extend its size by +50%
+                            ratio = 1.5
                             logging.debug(_("GL: Reallocate GCode lite buffer %d -> %d") % \
                                           (self.vertices.size, int(self.vertices.size * ratio)))
 
-                        vertices[vertex_k] = prev_pos[0]
-                        vertices[vertex_k + 1] = prev_pos[1]
-                        vertices[vertex_k + 2] = prev_pos[2]
-                        vertices[vertex_k + 3] = current_pos[0]
-                        vertices[vertex_k + 4] = current_pos[1]
-                        vertices[vertex_k + 5] = current_pos[2]
-                        vertex_k += coord_per_line
+                            self.vertices.resize(int(self.vertices.size * ratio),
+                                                 refcheck = False)
+                            self.indices.resize(int(self.indices.size * ratio),
+                                                 refcheck = False)
 
+                        buff_idx = vertex_k * bufferlen_per_vertex
                         vertex_color = self.movement_color(gline)
-                        colors[color_k] = vertex_color[0]
-                        colors[color_k + 1] = vertex_color[1]
-                        colors[color_k + 2] = vertex_color[2]
-                        colors[color_k + 3] = vertex_color[3]
-                        colors[color_k + 4] = vertex_color[0]
-                        colors[color_k + 5] = vertex_color[1]
-                        colors[color_k + 6] = vertex_color[2]
-                        colors[color_k + 7] = vertex_color[3]
-                        color_k += channels_per_line
+
+                        # only add two new vertices when the color is different
+                        # from the previous one
+                        if vertex_color == prev_col and vertex_k != 0:
+                            vertices[buff_idx : buff_idx + 3] = current_pos
+                            vertices[buff_idx + 3 : buff_idx + 7] = vertex_color
+                            vertex_k += 1
+                        else:
+                            vertices[buff_idx : buff_idx + 3] = prev_pos
+                            vertices[buff_idx + 3 : buff_idx + 7] = vertex_color
+                            vertices[buff_idx + 7 : buff_idx + 10] = current_pos
+                            vertices[buff_idx + 10 : buff_idx + 14] = vertex_color
+                            vertex_k += 2
+
+                        if not gline.extruding:
+                            travel_indices.append(vertex_k - 2)
+                            travel_indices.append(vertex_k - 1)
+                            travel_index_k += 2
+                        else:
+                            indices[index_k] = vertex_k - 2
+                            indices[index_k + 1] = vertex_k - 1
+                            index_k += 2
 
                         prev_pos = current_pos
+                        prev_col = vertex_color
                         prev_gline = gline
-                        gline.gcview_end_vertex = vertex_k // 3
+                        gline.gcview_end_vertex = vertex_k
 
                 if has_movement:
-                    self.layer_stops.append(vertex_k // 3)
+                    self.layer_stops.append(index_k)
+                    self.layer_stops_travels.append(travel_index_k)
                     self.layer_idxs_map[layer_idx] = len(self.layer_stops) - 1
                     self.max_layers = len(self.layer_stops) - 1
                     self.num_layers_to_draw = self.max_layers + 1
@@ -1503,8 +1533,10 @@ class GcodeModelLight(Model):
                          (model_data.ymin, model_data.ymax, model_data.depth),
                          (model_data.zmin, model_data.zmax, model_data.height))
 
-            self.vertices.resize(vertex_k, refcheck = False)
-            self.colors.resize(color_k, refcheck = False)
+            self.vertices.resize(vertex_k * bufferlen_per_vertex,
+                                 refcheck = False)
+            self.indices.resize(index_k, refcheck = False)
+
             self.max_layers = len(self.layer_stops) - 1
             self.num_layers_to_draw = self.max_layers + 1
             self.initialized = False
@@ -1514,7 +1546,7 @@ class GcodeModelLight(Model):
         t_end = time.time()
 
         logging.debug(_('GL: Initialized GCode model lite in %.2f seconds') % (t_end - t_start))
-        logging.debug(_('GL: GCode model lite vertex count: %d') % (len(self.vertices) // 3))
+        logging.debug(_('GL: GCode model lite vertex count: %d') % (len(self.vertices) // bufferlen_per_vertex))
         yield None
 
     def update_colors(self) -> None:
@@ -1522,7 +1554,8 @@ class GcodeModelLight(Model):
 
     def copy(self) -> 'GcodeModelLight':
         copy = GcodeModelLight()
-        for var in ["vertices", "colors", "max_layers",
+        for var in ["vertices", "indices", "travels", "max_layers",
+                    "layer_stops_travels", "travel_index_offset",
                     "num_layers_to_draw", "printed_until",
                     "layer_stops", "dims", "only_current",
                     "layer_idxs_map", "gcode"]:
@@ -1545,40 +1578,78 @@ class GcodeModelLight(Model):
             self.layers_loaded = self.max_layers
             self.initialized = True
             if not self.buffers_created:
-                self.vao, self.vbo, _ = renderer.create_buffers(create_ebo=False,
-                                                                lines_only=True)
+                self.vao, self.vbo, self.ebo = renderer.create_buffers(lines_only=True)
                 self.buffers_created = True
             else:
                 glBindVertexArray(self.vao)
 
-            # TODO: Indexed data would be nice to have?
-            vb = renderer.interleave_vertex_data(self.vertices.reshape(-1, 3),
-                                                 self.colors.reshape(-1, 4),
-                                                 distinct_colors=True)
-            renderer.fill_buffer(self.vbo, vb, GL_ARRAY_BUFFER)
+            self.travel_index_offset = self.indices.size
+            indices_all = np.concatenate((self.indices, self.travels))
+            renderer.fill_buffer(self.vbo, self.vertices, GL_ARRAY_BUFFER)
+            renderer.fill_buffer(self.ebo,
+                                 indices_all.data, GL_ELEMENT_ARRAY_BUFFER)
 
             if self.fully_loaded:
                 # Delete numpy arrays after creating VBOs after full load
                 self.vertices = np.zeros(0, dtype=GLfloat)
-                self.colors = np.zeros(0, dtype=GLfloat)
-
+                self.indices = np.zeros(0, dtype=GLuint)
 
     def draw(self) -> None:
-        renderer.update_ubo_transform(self.ubo, self.modelmatrix)
-        self.shaderlist["lines"].use()
-
         glBindVertexArray(self.vao)
+        renderer.update_ubo_transform(self.ubo, self.modelmatrix)
         with self.lock:
+            self.shaderlist["lines"].use()
             self._display_movements()
 
-    def _display_movements(self) -> None:
-        sid = self.shaderlist["lines"].id
+            if self.display_travels:
+                self.shaderlist["lines"].use()
+                self._display_travels()
 
+    def _display_travels(self) -> None:
+        sid = self.shaderlist["lines"].id
+        # Prevent race condition by using the number of currently loaded layers
+        max_layers = self.layers_loaded
+        current_index = min(self.num_layers_to_draw, max_layers)
+
+        start_index = self.travel_index_offset
+        end_index = self.travel_index_offset + \
+                    self.layer_stops_travels[max_layers]
+
+        # Draw current layer travels
+        if self.num_layers_to_draw <= max_layers:
+            current_start = self.travel_index_offset + \
+                            self.layer_stops_travels[current_index - 1]
+            current_end = self.travel_index_offset + \
+                          self.layer_stops_travels[current_index]
+
+            renderer.load_uniform(sid, "u_OverwriteColor", True)
+            renderer.load_uniform(sid, "u_oColor",
+                                  self.color_current_travel)
+
+            glDrawRangeElements(GL_LINES, current_start, current_end,
+                                current_end - current_start, GL_UNSIGNED_INT,
+                                sizeof(GLuint) * current_start)
+
+            renderer.load_uniform(sid, "u_OverwriteColor", False)
+            end_index = current_start
+
+        # Draw all other visible travels
+        if not self.only_current:
+            glDrawRangeElements(GL_LINES, start_index, end_index,
+                                end_index - start_index, GL_UNSIGNED_INT,
+                                sizeof(GLuint) * start_index)
+
+
+    def _display_movements(self) -> None:
+
+
+        sid = self.shaderlist["lines"].id
         # Prevent race condition by using the number of currently loaded layers
         max_layers = self.layers_loaded
 
         start = 0
-        if self.num_layers_to_draw <= max_layers:
+        layer_selected = self.num_layers_to_draw <= max_layers
+        if layer_selected:
             end_prev_layer = self.layer_stops[self.num_layers_to_draw - 1]
         else:
             end_prev_layer = -1
@@ -1591,9 +1662,13 @@ class GcodeModelLight(Model):
         cur_end = min(self.printed_until, end)
         if not self.only_current:
             if 0 <= end_prev_layer <= cur_end:
-                glDrawArrays(GL_LINES, start, end_prev_layer)
+                glDrawRangeElements(GL_LINES, start, end_prev_layer,
+                                    end_prev_layer - start, GL_UNSIGNED_INT,
+                                    sizeof(GLuint) * start)
             elif cur_end >= 0:
-                glDrawArrays(GL_LINES, start, cur_end)
+                glDrawRangeElements(GL_LINES, start, cur_end,
+                                    cur_end - start, GL_UNSIGNED_INT,
+                                    sizeof(GLuint) * start)
 
         renderer.load_uniform(sid, "u_OverwriteColor", False)
 
@@ -1601,7 +1676,9 @@ class GcodeModelLight(Model):
         start = max(cur_end, 0)
         if end_prev_layer >= start:
             if not self.only_current:
-                glDrawArrays(GL_LINES, start, end_prev_layer - start)
+                glDrawRangeElements(GL_LINES, start, end_prev_layer,
+                                    end_prev_layer - start, GL_UNSIGNED_INT,
+                                    sizeof(GLuint) * start)
             cur_end = end_prev_layer
 
         # Draw current layer
@@ -1615,19 +1692,27 @@ class GcodeModelLight(Model):
                                   self.color_current_printed)
 
             if cur_end > end_prev_layer:
-                glDrawArrays(GL_LINES, end_prev_layer, cur_end - end_prev_layer)
+                glDrawRangeElements(GL_LINES, end_prev_layer, cur_end,
+                                    cur_end - end_prev_layer, GL_UNSIGNED_INT,
+                                    sizeof(GLuint) * end_prev_layer)
+
 
             renderer.load_uniform(sid, "u_oColor",
                                   self.color_current)
 
             if end > cur_end:
-                glDrawArrays(GL_LINES, cur_end, end - cur_end)
+                glDrawRangeElements(GL_LINES, cur_end, end,
+                                    end - cur_end, GL_UNSIGNED_INT,
+                                    sizeof(GLuint) * cur_end)
+
 
             renderer.load_uniform(sid, "u_OverwriteColor", False)
 
         # Draw non printed stuff until end (if not ending at a given layer)
         start = max(self.printed_until, 0)
         end = end - start
-        if end_prev_layer < 0 < end and not self.only_current:
-            glDrawArrays(GL_LINES, start, end)
+        if not layer_selected and end >= start:
+            glDrawRangeElements(GL_LINES, start, end,
+                                end - start, GL_UNSIGNED_INT,
+                                sizeof(GLuint) * start)
 
