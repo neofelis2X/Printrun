@@ -1,11 +1,7 @@
-name: Build macOS app
+name: Build macOS app for testing A
 
 on:
-  push:
-  pull_request:
-  release:
-    types:
-      - published
+  workflow_dispatch:
 
 jobs:
   build:
@@ -25,6 +21,8 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v6
+      with:
+        ref: 'icons'
     - name: Set up Python
       uses: actions/setup-python@v6
       with:
@@ -38,13 +36,17 @@ jobs:
         python setup.py build_ext --inplace
     - name: Make pyinstaller spec
       run: |
-        pyi-makespec --hidden-import="pkg_resources.py2_warn" -F --add-data images/\*:images --add-data \*.png:. --add-data \*.ico:. --name Pronterface -w -i P-face.icns pronterface.py
+        pyi-makespec --windowed --name "Pronterface" --add-data "printrun/assets:printrun/assets" --icon "./assets_raw/icons/pronterface.icns" pronterface.py
         # Edit spec file
-        export git_hash=$(git rev-parse --short "$GITHUB_SHA")
+        export GIT_HASH=$(git rev-parse --short "$GITHUB_SHA")
+        export VERSION="$(python3 -c 'import printrun.printcore as core; print(core.__version__)' 2>/dev/null)"
+        export YEAR=$(date +%Y)
         sed -i '' '$ s/.$//' Pronterface.spec
         cat >> Pronterface.spec <<EOL
         info_plist={
-            'CFBundleShortVersionString': '$git_hash',
+            'CFBundleVersion': '$GIT_HASH',
+            'CFBundleShortVersionString': "$VERSION",
+            'NSHumanReadableCopyright': "FOSS © $YEAR, GPL-3.0 licensed",
             'NSPrincipalClass': 'NSApplication',
             'NSAppleScriptEnabled': False,
             'NSAppSleepDisabled': True,
@@ -63,20 +65,9 @@ jobs:
         cp -r locale dist
         cp README.md dist/
 
-    - name: Configuration for releases
-      if: ${{ github.event_name == 'release' }}
+    - name: Configuration for testing
       run: |
         echo "EXE_NAME=${{ github.ref_name }}_macos_${{ matrix.architecture }}" >> $GITHUB_ENV
-
-    - name: Configuration for pushes
-      if: ${{ github.event_name == 'push' }}
-      run: |
-        echo "EXE_NAME=printrun-nightly_${{ matrix.os }}_${{ matrix.architecture }}_py${{ matrix.python-version }}" >> $GITHUB_ENV
-
-    - name: Configuration for pull requests
-      if: ${{ github.event_name == 'pull_request' }}
-      run: |
-        echo "EXE_NAME=printrun-test_${{ matrix.os }}_${{ matrix.architecture }}_py${{ matrix.python-version }}" >> $GITHUB_ENV
 
     - name: Upload artifacts for inspection
       uses: actions/upload-artifact@v5
@@ -87,7 +78,3 @@ jobs:
             dist/README.md
             dist/locale
 
-  upload_release_assets:
-    needs: [build]
-    if: github.event_name == 'release' && github.event.action == 'published'
-    uses: kliment/Printrun/.github/workflows/upload-assets.yml@master
