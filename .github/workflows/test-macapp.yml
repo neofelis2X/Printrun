@@ -1,11 +1,7 @@
-name: Build macOS app
+name: Build macOS app for testing A
 
 on:
-  push:
-  pull_request:
-  release:
-    types:
-      - published
+  workflow_dispatch:
 
 jobs:
   build:
@@ -21,11 +17,13 @@ jobs:
           # build for Apple Silicon arm64
           - os: macos-14
             architecture: arm64
-            python-version: '3.13'
+            python-version: '3.14'
 
     steps:
     - name: Checkout
       uses: actions/checkout@v6
+      with:
+        ref: 'icons'
     - name: Set up Python
       uses: actions/setup-python@v6
       with:
@@ -68,20 +66,9 @@ jobs:
         cp -r locale dist
         cp README.md dist/
 
-    - name: Configuration for releases
-      if: ${{ github.event_name == 'release' }}
+    - name: Configuration for testing
       run: |
         echo "EXE_NAME=${{ github.ref_name }}_macos_${{ matrix.architecture }}" >> $GITHUB_ENV
-
-    - name: Configuration for pushes
-      if: ${{ github.event_name == 'push' }}
-      run: |
-        echo "EXE_NAME=printrun-nightly_${{ matrix.os }}_${{ matrix.architecture }}_py${{ matrix.python-version }}" >> $GITHUB_ENV
-
-    - name: Configuration for pull requests
-      if: ${{ github.event_name == 'pull_request' }}
-      run: |
-        echo "EXE_NAME=printrun-test_${{ matrix.os }}_${{ matrix.architecture }}_py${{ matrix.python-version }}" >> $GITHUB_ENV
 
     - name: Upload artifacts for inspection
       uses: actions/upload-artifact@v5
@@ -92,7 +79,3 @@ jobs:
             dist/README.md
             dist/locale
 
-  upload_release_assets:
-    needs: [build]
-    if: github.event_name == 'release' && github.event.action == 'published'
-    uses: kliment/Printrun/.github/workflows/upload-assets.yml@master
