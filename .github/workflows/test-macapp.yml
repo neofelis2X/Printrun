@@ -9,18 +9,16 @@ jobs:
 
     strategy:
       matrix:
-        os: [macos-13, macos-14]
+        os: [macos-14, macos-15-intel]
         architecture: [x64, arm64]
         arch: [x86_64, arm64]
         python-version: ['3.11', '3.13']
         include:
-          - os: macos-13
+          - os: macos-15-intel
             architecture: x64
-            arch: x86_64
             python-version: '3.11'
           - os: macos-14
             architecture: arm64
-            arch: arm64
             python-version: '3.13'
 
     steps:
@@ -41,7 +39,7 @@ jobs:
         python setup.py build_ext --inplace
     - name: Make pyinstaller spec
       run: |
-        pyi-makespec --windowed --name "Pronterface" --target-architecture "${{ matrix.arch }}" --add-data "printrun/assets:printrun/assets" --icon "./assets_raw/icons/pronterface.icns" pronterface.py
+        pyi-makespec --windowed --name "Pronterface" --target-architecture "${{ matrix.architecture == 'arm64' && 'arm64' || 'x86_64' }}" --add-data "printrun/assets:printrun/assets" --icon "./assets_raw/icons/pronterface.icns" pronterface.py
         # Edit spec file
         export GIT_HASH=$(git rev-parse --short "$GITHUB_SHA")
         export VERSION="$(python3 -c 'import printrun.printcore as core; print(core.__version__)' 2>/dev/null)"
