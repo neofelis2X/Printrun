@@ -27,6 +27,14 @@ echo "Writing pyinstaller specification..."
 echo $STYLE_OFF
 rm -rf dist
 
+echo $STYLE_ON
+echo "Collecting current printrun version..."
+echo $STYLE_OFF
+GIT_HASH=$(git rev-parse --short HEAD)
+VERSION="$(python3 -c 'import printrun.printcore as core; print(core.__version__)' 2>/dev/null)"
+YEAR=$(date +%Y)
+echo "Printrun version: $VERSION"
+
 pyi-makespec --windowed --name "Pronterface" \
 	--add-data "printrun/assets:printrun/assets" \
 	--icon "./assets_raw/icons/pronterface.icns" pronterface.py
@@ -34,6 +42,9 @@ pyi-makespec --windowed --name "Pronterface" \
 sed -i '' '$ s/.$//' Pronterface.spec
 cat >> Pronterface.spec <<EOL
 info_plist={
+    'CFBundleVersion': '$GIT_HASH',
+    'CFBundleShortVersionString': "$VERSION",
+    'NSHumanReadableCopyright': "FOSS © $YEAR, GPL-3.0 licensed",
     'NSPrincipalClass': 'NSApplication',
     'NSAppleScriptEnabled': False,
     'NSAppSleepDisabled': True,
@@ -47,6 +58,9 @@ pyi-makespec --console --onefile --name "Pronsole" \
 sed -i '' '$ s/.$//' Pronsole.spec
 cat >> Pronsole.spec <<EOL
 info_plist={
+    'CFBundleVersion': '$GIT_HASH',
+    'CFBundleShortVersionString': "$VERSION",
+    'NSHumanReadableCopyright': "FOSS © $YEAR, GPL-3.0 licensed",
     'NSPrincipalClass': 'NSApplication',
     'NSAppleScriptEnabled': False,
     'NSAppSleepDisabled': True,
@@ -61,6 +75,9 @@ pyi-makespec --windowed --name "Plater" \
 sed -i '' '$ s/.$//' Plater.spec
 cat >> Plater.spec <<EOL
 info_plist={
+    'CFBundleVersion': '$GIT_HASH',
+    'CFBundleShortVersionString': "$VERSION",
+    'NSHumanReadableCopyright': "FOSS © $YEAR, GPL-3.0 licensed",
     'NSPrincipalClass': 'NSApplication',
     'NSAppleScriptEnabled': False,
     'NSAppSleepDisabled': True,

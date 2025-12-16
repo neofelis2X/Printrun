@@ -40,11 +40,15 @@ jobs:
       run: |
         pyi-makespec --windowed --name "Pronterface" --add-data "printrun/assets:printrun/assets" --icon "./assets_raw/icons/pronterface.icns" pronterface.py
         # Edit spec file
-        export git_hash=$(git rev-parse --short "$GITHUB_SHA")
+        export GIT_HASH=$(git rev-parse --short "$GITHUB_SHA")
+        export VERSION="$(python3 -c 'import printrun.printcore as core; print(core.__version__)' 2>/dev/null)"
+        export YEAR=$(date +%Y)
         sed -i '' '$ s/.$//' Pronterface.spec
         cat >> Pronterface.spec <<EOL
         info_plist={
-            'CFBundleShortVersionString': '$git_hash',
+            'CFBundleVersion': '$GIT_HASH',
+            'CFBundleShortVersionString': "$VERSION",
+            'NSHumanReadableCopyright': "FOSS © $YEAR, GPL-3.0 licensed",
             'NSPrincipalClass': 'NSApplication',
             'NSAppleScriptEnabled': False,
             'NSAppSleepDisabled': True,
