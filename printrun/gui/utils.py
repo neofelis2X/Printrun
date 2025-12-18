@@ -26,12 +26,13 @@ def make_button(parent, label, callback, tooltip, container = None, size = wx.De
 def make_autosize_button(*args):
     return make_button(*args, size = (-1, -1), style = wx.BU_EXACTFIT)
 
-def make_custom_button(root, parentpanel, i, style = 0):
-    btn = make_button(parentpanel, i.label, root.process_button,
-                      i.tooltip, style = style)
-    btn.SetBackgroundColour(i.background)
-    btn.SetForegroundColour("black")
-    btn.properties = i
-    root.btndict[i.command] = btn
+def make_custom_button(root, parentpanel, properties, style = 0):
+    btn = make_button(parentpanel, properties.label, root.process_button,
+                      properties.tooltip, style = style)
+    if properties.background:
+        btn.SetBackgroundColour(properties.background)
+        btn.SetForegroundColour(wx.BLACK)
+    btn.properties = properties
+    root.btndict[properties.command] = btn
     root.printerControls.append(btn)
     return btn

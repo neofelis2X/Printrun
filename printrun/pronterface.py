@@ -162,9 +162,9 @@ class PronterWindow(MainWindow, pronsole.pronsole):
         self.uploading = False
         self.sentglines = queue.Queue(0)
         self.cpbuttons = {
-            "motorsoff": SpecialButton(_("Motors off"), ("M84"), (250, 250, 250), _("Switch all motors off")),
-            "extrude": SpecialButton(_("Extrude"), ("pront_extrude"), (225, 200, 200), _("Advance extruder by set length")),
-            "reverse": SpecialButton(_("Reverse"), ("pront_reverse"), (225, 200, 200), _("Reverse extruder by set length")),
+            "motorsoff": SpecialButton(_("Motors Off"), ("M84"), tooltip=_("Switch all motors off")),
+            "extrude": SpecialButton(_("Extrude"), ("pront_extrude"), tooltip=_("Advance extruder by set length")),
+            "reverse": SpecialButton(_("Reverse"), ("pront_reverse"), tooltip=_("Reverse extruder by set length")),
         }
         self.custombuttons = []
         self.btndict = {}
@@ -194,6 +194,7 @@ class PronterWindow(MainWindow, pronsole.pronsole):
         self.window_ready = True
         self.Bind(wx.EVT_CLOSE, self.closewin)
         self.Bind(wx.EVT_CHAR_HOOK, self.on_key)
+        self.Bind(wx.EVT_SYS_COLOUR_CHANGED, self.on_theme_change)
         # set feedrates in printcore for pause/resume
         self.p.xy_feedrate = self.settings.xy_feedrate
         self.p.z_feedrate = self.settings.z_feedrate
@@ -364,6 +365,10 @@ class PronterWindow(MainWindow, pronsole.pronsole):
 
         event.Skip()
 
+    def on_theme_change(self, event):
+        self.reload_ui()
+        event.Skip()
+
     def closewin(self, e):
         e.StopPropagation()
         self.do_exit("force")
@@ -396,9 +401,14 @@ class PronterWindow(MainWindow, pronsole.pronsole):
 
     @property
     def bgcolor(self):
-        return (wx.SystemSettings.GetColour(wx.SYS_COLOUR_WINDOWFRAME)
-                if self.settings.bgcolor == 'auto'
-                else self.settings.bgcolor)
+        if self.settings.use_bgcolor:
+            appearance = wx.SystemSettings.GetAppearance()
+            if platform.system() == "Darwin" and appearance.IsDark():
+                return self.settings.bgcolor_dark
+            return self.settings.bgcolor
+
+        native = wx.SystemSettings.GetColour(wx.SYS_COLOUR_WINDOW)
+        return native.GetAsString(flags=wx.C2S_HTML_SYNTAX)
 
     #  --------------------------------------------------------------
     #  Main interface actions
@@ -1094,7 +1104,10 @@ Printrun. If not, see <http://www.gnu.org/licenses/>."""
         self.settings._add(SpinSetting("preview_grid_step1", 10., 0, 200, _("Fine grid spacing"), _("Fine Grid Spacing"), "Viewer"), self.update_gviz_params)
         self.settings._add(SpinSetting("preview_grid_step2", 50., 0, 200, _("Coarse grid spacing"), _("Coarse Grid Spacing"), "Viewer"), self.update_gviz_params)
         self.settings._add(StaticTextSetting("separator_colors1", _("General"), "", group = "Colors"))
+        self.settings._add(BooleanSetting("use_bgcolor", False, _("Use custom background color"), _("Use native or custom color for main window background"), "Colors"), self.reload_ui)
         self.settings._add(ColorSetting("bgcolor", self._preferred_bgcolour_hex(), _("Background color"), _("Pronterface background color"), "Colors", isRGBA=False), self.reload_ui)
+        if platform.system() == 'Darwin':
+            self.settings._add(ColorSetting("bgcolor_dark", self._preferred_bgcolour_hex(), _("Background color dark"), _("Pronterface background color for darkmode"), "Colors", isRGBA=False), self.reload_ui)
         self.settings._add(StaticTextSetting("separator_colors2", _("Temperature Graph"), "", group = "Colors"))
         self.settings._add(ColorSetting("graph_color_background", "#FAFAC7", _("Graph background color"), _("Color of the temperature graph background"), "Colors", isRGBA=False), self.reload_ui)
         self.settings._add(ColorSetting("graph_color_text", "#172C2C", _("Graph text color"), _("Color of the temperature graph text"), "Colors", isRGBA=False), self.reload_ui)
@@ -1123,9 +1136,12 @@ Printrun. If not, see <http://www.gnu.org/licenses/>."""
         self.settings._add(recentfilessetting, self.update_recent_files)
 
     def _preferred_bgcolour_hex(self):
-        id = wx.SYS_COLOUR_WINDOW \
-            if platform.system() == 'Windows' \
-            else wx.SYS_COLOUR_BACKGROUND
+        id = wx.SYS_COLOUR_WINDOW
+
+        # Do linux platform need different bgcolor ?
+        # if platform.system() not in ("Windows", "Darwin"):
+        #     id = wx.SYS_COLOUR_BACKGROUND
+
         sys_bgcolour = wx.SystemSettings.GetColour(id)
         return sys_bgcolour.GetAsString(flags=wx.C2S_HTML_SYNTAX)
 
