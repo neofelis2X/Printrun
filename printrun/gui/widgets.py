@@ -662,10 +662,10 @@ class TempGauge(wx.Panel):
         dc.SetBackground(wx.Brush(self.bgcolor))
         dc.Clear()
         cold, medium, hot = wx.Colour(0, 167, 223), wx.Colour(239, 233, 119), wx.Colour(210, 50, 0)
-        # gauge1, gauge2 = wx.Colour(255, 255, 210), (self.gaugeColour or wx.Colour(234, 82, 0))
         gauge1 = wx.Colour(255, 255, 210)
         shadow1, shadow2 = wx.Colour(110, 110, 110), self.bgcolor
         gc = wx.GraphicsContext.Create(dc)
+
         # draw shadow first
         # corners
         gc.SetBrush(gc.CreateRadialGradientBrush(xE - 7, 9, xE - 7, 9, 8, shadow1, shadow2))
@@ -679,49 +679,48 @@ class TempGauge(wx.Panel):
         gc.DrawRectangle(xE - 7, 9, 8, 8)
         gc.SetBrush(gc.CreateLinearGradientBrush(x0, yE - 2, x0, yE + 5, shadow1, shadow2))
         gc.DrawRectangle(x0 + 6, yE - 2, xE - 12, 7)
+
         # draw gauge background
-        gc.SetBrush(gc.CreateLinearGradientBrush(x0, y0, x1 + 1, y1, cold, medium))
-        gc.DrawRoundedRectangle(x0, y0, x1 + 4, yE, 6)
-        gc.SetBrush(gc.CreateLinearGradientBrush(x1 - 2, y1, xE, y1, medium, hot))
-        gc.DrawRoundedRectangle(x1 - 2, y1, xE - x1, yE, 6)
+        gstops = wx.GraphicsGradientStops()
+        gstops.SetStartColour(cold)
+        gstops.SetEndColour(hot)
+        gs = wx.GraphicsGradientStop(medium, x1 / (xE - x0))
+        gstops.Add(gs)
+        brush = gc.CreateLinearGradientBrush(x0, y0, xE, yE, gstops)
+        gc.SetBrush(brush)
+        gc.DrawRoundedRectangle(x0, y0, xE, yE, 3)
+
         # draw gauge
-        width = 12
-        w1 = y0 + 9 - width / 2
-        w2 = w1 + width
+        gheight = self.height * 0.4
+        offset = (self.height - gheight) / 2.0
         value = x0 + max(10, min(self.width + 1 - 2, int(self.value * self.scale)))
-        # gc.SetBrush(gc.CreateLinearGradientBrush(x0, y0 + 3, x0, y0 + 15, gauge1, gauge2))
-        # gc.SetBrush(gc.CreateLinearGradientBrush(0, 3, 0, 15, wx.Colour(255, 255, 255), wx.Colour(255, 90, 32)))
         gc.SetBrush(gc.CreateLinearGradientBrush(x0, y0 + 3, x0, y0 + 15, gauge1, self.interpolatedColour(value, x0, x1, xE, cold, medium, hot)))
-        val_path = gc.CreatePath()
-        val_path.MoveToPoint(x0, w1)
-        val_path.AddLineToPoint(value, w1)
-        val_path.AddLineToPoint(value + 2, w1 + width / 4)
-        val_path.AddLineToPoint(value + 2, w2 - width / 4)
-        val_path.AddLineToPoint(value, w2)
-        # val_path.AddLineToPoint(value-4, 10)
-        val_path.AddLineToPoint(x0, w2)
-        gc.DrawPath(val_path)
+        gc.DrawRoundedRectangle(offset, offset, value, gheight, 2)
+
         # draw setpoint markers
         setpoint = x0 + max(10, int(self.setpoint * self.scale))
-        gc.SetBrush(gc.CreateBrush(wx.Brush(wx.Colour(0, 0, 0))))
+        gc.SetBrush(gc.CreateBrush(wx.Brush(wx.BLACK)))
         setp_path = gc.CreatePath()
+        # Upper triangle
         setp_path.MoveToPoint(setpoint - 4, y0)
         setp_path.AddLineToPoint(setpoint + 4, y0)
         setp_path.AddLineToPoint(setpoint, y0 + 5)
+        # Lower triangle
         setp_path.MoveToPoint(setpoint - 4, yE)
         setp_path.AddLineToPoint(setpoint + 4, yE)
         setp_path.AddLineToPoint(setpoint, yE - 5)
         gc.DrawPath(setp_path)
+
         # draw readout
         text = "T\u00B0 %u/%u" % (self.value, self.setpoint)
-        # gc.SetFont(gc.CreateFont(wx.Font(12, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD), wx.WHITE))
-        # gc.DrawText(text, 29,-2)
-        gc.SetFont(gc.CreateFont(wx.Font(10, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD), wx.WHITE))
-        gc.DrawText(self.title, x0 + 19, y0 + 4)
-        gc.DrawText(text, x0 + 119, y0 + 4)
-        gc.SetFont(gc.CreateFont(wx.Font(10, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD)))
-        gc.DrawText(self.title, x0 + 18, y0 + 3)
-        gc.DrawText(text, x0 + 118, y0 + 3)
+        font = wx.Font(11, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD)
+        y_pos = (self.height - font.GetPixelSize()[1]) / 2.0
+        gc.SetFont(gc.CreateFont(font, wx.WHITE))
+        gc.DrawText(self.title, self.height * 0.9, y_pos)
+        gc.DrawText(text, self.height * 4, y_pos)
+        gc.SetFont(gc.CreateFont(font, wx.BLACK))
+        gc.DrawText(self.title, self.height * 0.9 - 1, y_pos - 1)
+        gc.DrawText(text, self.height * 4 - 1, y_pos - 1)
 
 class SpecialButton:
 
