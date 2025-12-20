@@ -42,7 +42,7 @@ class ToggleablePane(wx.BoxSizer):
         self.parentpanel = parentpanel
         self.parentsizers = parentsizers
         self.panepanel = root.newPanel(parentpanel)
-        self.button = wx.Button(parentpanel, -1, label, size = (35, 18), style = wx.BU_EXACTFIT)
+        self.button = wx.Button(parentpanel, -1, label, style = wx.BU_EXACTFIT | wx.BORDER_NONE)
         self.button.Bind(wx.EVT_BUTTON, self.toggle)
 
     def toggle(self, event):
@@ -59,7 +59,7 @@ class LeftPaneToggleable(ToggleablePane):
     def __init__(self, root, parentpanel, parentsizers):
         super().__init__(root, "<", parentpanel, parentsizers)
         self.Add(self.panepanel, 0, wx.EXPAND)
-        self.Add(self.button, 0)
+        self.Add(self.button, 0, wx.EXPAND)
 
     def set_sizer(self, sizer):
         self.panepanel.SetSizer(sizer)
@@ -81,7 +81,7 @@ class LeftPaneToggleable(ToggleablePane):
 class LogPaneToggleable(ToggleablePane):
     def __init__(self, root, parentpanel, parentsizers):
         super(LogPaneToggleable, self).__init__(root, ">", parentpanel, parentsizers)
-        self.Add(self.button, 0)
+        self.Add(self.button, 0, wx.EXPAND)
         pane = LogPane(root, self.panepanel)
         self.panepanel.SetSizer(pane)
         self.Add(self.panepanel, 1, wx.EXPAND)
