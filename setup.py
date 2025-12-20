@@ -66,7 +66,6 @@ def get_packagedata():
         "printrun.assets.toolbar": ["*.svg"],
         "printrun.assets.controls": ["*.png", ".svg"],
         "printrun.assets.icons.pronterface": ["*.png"],
-        "printrun.assets.icons.plater": ["*.png"],
     }
 
     return package_data

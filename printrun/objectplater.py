@@ -372,7 +372,7 @@ class Plater(wx.Dialog):
         if icons:
             self.SetIcons(icons)
         else:
-            self.SetIcons(get_iconbundle("plater"))
+            self.SetIcons(get_iconbundle("pronterface"))
 
         self.prepare_ui(**kwargs)
         self.CenterOnParent()
