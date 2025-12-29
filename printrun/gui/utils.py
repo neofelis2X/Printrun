@@ -25,7 +25,7 @@ def make_button(parent, label, callback, tooltip, container = None,
     button.Bind(wx.EVT_BUTTON, callback)
     button.SetToolTip(wx.ToolTip(tooltip))
     if container:
-        container.Add(button)
+        container.Add(button, flag = flag)
     return button
 
 def make_autosize_button(*args):

@@ -16,6 +16,7 @@
 import wx
 
 from .utils import make_autosize_button
+from .widgets import get_space
 
 def MainToolbar(root, parentpanel = None, use_wrapsizer = False):
     if not parentpanel: parentpanel = root.panel
@@ -27,22 +28,28 @@ def MainToolbar(root, parentpanel = None, use_wrapsizer = False):
         parentpanel = root.newPanel(parentpanel)
         glob.Add(parentpanel, 1, flag = wx.EXPAND)
         glob.Add(root.locker, 0, flag = wx.ALIGN_CENTER)
+
     ToolbarSizer = wx.WrapSizer if use_wrapsizer else wx.BoxSizer
     self = ToolbarSizer(wx.HORIZONTAL)
+
     root.rescanbtn = make_autosize_button(parentpanel, _("Port"), root.rescanports, _("Communication Settings\nClick to rescan ports"))
-    self.Add(root.rescanbtn, 0, wx.TOP | wx.LEFT, 0)
+    self.Add(root.rescanbtn, 0)
+    self.AddSpacer(get_space("mini"))
 
     root.serialport = wx.ComboBox(parentpanel, -1, choices = root.scanserial(),
                                   style = wx.CB_DROPDOWN)
     root.serialport.SetToolTip(wx.ToolTip(_("Select Port Printer is connected to")))
     root.rescanports()
     self.Add(root.serialport)
+    self.AddSpacer(get_space("mini"))
 
-    self.Add(wx.StaticText(parentpanel, -1, "@"), 0, wx.RIGHT | wx.ALIGN_CENTER, 0)
+    self.Add(wx.StaticText(parentpanel, -1, "@"), 0, wx.ALIGN_CENTER)
+    self.AddSpacer(get_space("mini"))
+
     root.baud = wx.ComboBox(parentpanel, -1,
                             choices = ["2400", "9600", "19200", "38400",
                                        "57600", "115200", "250000", "500000", "1000000"],
-                            style = wx.CB_DROPDOWN, size = (110, -1))
+                            style = wx.CB_DROPDOWN, size = wx.Size(110, -1))
     root.baud.SetToolTip(wx.ToolTip(_("Select Baud rate for printer communication")))
     try:
         root.baud.SetValue("115200")
@@ -50,6 +57,7 @@ def MainToolbar(root, parentpanel = None, use_wrapsizer = False):
     except:
         pass
     self.Add(root.baud)
+    self.AddSpacer(get_space("mini"))
 
     if not hasattr(root, "connectbtn"):
         root.connectbtn_cb_var = root.connect
@@ -58,18 +66,22 @@ def MainToolbar(root, parentpanel = None, use_wrapsizer = False):
     else:
         root.connectbtn.Reparent(parentpanel)
     self.Add(root.connectbtn)
+    self.AddSpacer(get_space("mini"))
+
     if not hasattr(root, "resetbtn"):
         root.resetbtn = make_autosize_button(parentpanel, _("Reset"), root.reset, _("Reset the printer"))
         root.statefulControls.append(root.resetbtn)
     else:
         root.resetbtn.Reparent(parentpanel)
     self.Add(root.resetbtn)
-
     self.AddStretchSpacer(prop = 1)
 
     root.loadbtn = make_autosize_button(parentpanel, _("Load file"), root.loadfile, _("Load a 3D model file"), self)
+    self.AddSpacer(get_space("mini"))
     root.sdbtn = make_autosize_button(parentpanel, _("SD"), root.sdmenu, _("SD Card Printing"), self)
     root.sdbtn.Reparent(parentpanel)
+    self.AddSpacer(get_space("mini"))
+
     root.printerControls.append(root.sdbtn)
     if not hasattr(root, "printbtn"):
         root.printbtn = make_autosize_button(parentpanel, _("Print"), root.printfile, _("Start Printing Loaded File"))
@@ -77,12 +89,16 @@ def MainToolbar(root, parentpanel = None, use_wrapsizer = False):
     else:
         root.printbtn.Reparent(parentpanel)
     self.Add(root.printbtn)
+    self.AddSpacer(get_space("mini"))
+
     if not hasattr(root, "pausebtn"):
         root.pausebtn = make_autosize_button(parentpanel, _("Pause"), root.pause, _("Pause Current Print"))
         root.statefulControls.append(root.pausebtn)
     else:
         root.pausebtn.Reparent(parentpanel)
     self.Add(root.pausebtn)
+    self.AddSpacer(get_space("mini"))
+
     root.offbtn = make_autosize_button(parentpanel, _("Off"), root.off, _("Turn printer off"), self)
     root.printerControls.append(root.offbtn)
 
@@ -91,5 +107,4 @@ def MainToolbar(root, parentpanel = None, use_wrapsizer = False):
     if root.settings.lockbox:
         parentpanel.SetSizer(self)
         return glob
-    else:
-        return self
+    return self
