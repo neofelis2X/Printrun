@@ -16,15 +16,17 @@
 import wx
 
 from .utils import make_button
+from .widgets import get_space
 
 class LogPane(wx.BoxSizer):
 
     def __init__(self, root, parentpanel = None):
         super(LogPane, self).__init__(wx.VERTICAL)
         if not parentpanel: parentpanel = root.panel
-        root.logbox = wx.TextCtrl(parentpanel, style = wx.TE_MULTILINE, size = (350, -1))
-        root.logbox.SetMinSize((100, -1))
-        root.logbox.SetEditable(0)
+        root.logbox = wx.TextCtrl(parentpanel, style = wx.TE_MULTILINE,
+                                  size = wx.Size(350, -1))
+        root.logbox.SetMinSize(wx.Size(100, -1))
+        root.logbox.SetEditable(False)
         self.Add(root.logbox, 1, wx.EXPAND)
         bottom_panel = root.newPanel(parentpanel)
         lbrs = wx.BoxSizer(wx.HORIZONTAL)
@@ -43,6 +45,11 @@ class LogPane(wx.BoxSizer):
         root.commandbox.history = [""]
         root.commandbox.histindex = 1
         lbrs.Add(root.commandbox, 1)
-        root.sendbtn = make_button(bottom_panel, _("Send"), root.sendline, _("Send Command to Printer"), style = wx.BU_EXACTFIT, container = lbrs)
+        lbrs.AddSpacer(get_space("mini"))
+        root.sendbtn = make_button(bottom_panel, _("Send"), root.sendline,
+                                   _("Send Command to Printer"),
+                                   style = wx.BU_EXACTFIT, container = lbrs,
+                                   flag = wx.ALIGN_CENTER)
         bottom_panel.SetSizer(lbrs)
-        self.Add(bottom_panel, 0, wx.EXPAND)
+        self.Add(bottom_panel, 0, wx.EXPAND | wx.ALL,
+                 border = get_space("mini"))

@@ -30,6 +30,7 @@ from .controls import ControlsSizer, add_extra_controls
 from .viz import VizPane
 from .log import LogPane
 from .toolbar import MainToolbar
+from .widgets import get_space
 
 class ToggleablePane(wx.BoxSizer):
 
@@ -164,7 +165,7 @@ class MainWindow(wx.Frame):
         self.lowersizer.Add(rightsizer, 1, wx.ALIGN_CENTER)
         self.mainsizer_page1.Add(page1panel2, 1)
         self.mainsizer = wx.BoxSizer(wx.HORIZONTAL)
-        self.splitterwindow = wx.SplitterWindow(page2panel, style = wx.SP_3D)
+        self.splitterwindow = wx.SplitterWindow(page2panel, style = wx.SP_NOBORDER)
         page2sizer1 = wx.BoxSizer(wx.HORIZONTAL)
         page2panel1 = self.newPanel(self.splitterwindow)
         page2sizer2 = wx.BoxSizer(wx.HORIZONTAL)
@@ -236,7 +237,8 @@ class MainWindow(wx.Frame):
         controls_sizer = ControlsSizer(self, controls_panel, mini_mode = mini)
         controls_panel.SetSizer(controls_sizer)
         left_sizer = wx.BoxSizer(wx.VERTICAL)
-        left_sizer.Add(controls_panel, 1, wx.EXPAND)
+        left_sizer.Add(controls_panel, 1, wx.EXPAND | wx.LEFT | wx.RIGHT,
+                       border = get_space("mini"))
         left_pane.set_sizer(left_sizer)
         self.lowersizer.Add(leftpanel, 0, wx.EXPAND)
         if compact:
@@ -247,7 +249,7 @@ class MainWindow(wx.Frame):
             rightpanel = self.newPanel(lowerpanel)
             rightsizer = wx.BoxSizer(wx.VERTICAL)
             rightpanel.SetSizer(rightsizer)
-            self.splitterwindow = wx.SplitterWindow(rightpanel, style = wx.SP_3D | wx.SP_LIVE_UPDATE)
+            self.splitterwindow = wx.SplitterWindow(rightpanel, style = wx.SP_NOBORDER | wx.SP_LIVE_UPDATE)
             self.splitterwindow.SetMinimumPaneSize(150)
             self.splitterwindow.SetSashGravity(0.8)
             rightsizer.Add(self.splitterwindow, 1, wx.EXPAND)
@@ -258,10 +260,12 @@ class MainWindow(wx.Frame):
             self.splitterwindow.shrinked = False
         viz_pane = VizPane(self, vizpanel)
         # Custom buttons
-        self.cbuttonssizer = wx.WrapSizer(wx.HORIZONTAL)
+        self.cbuttonssizer = wx.WrapSizer(wx.HORIZONTAL,
+                                          flags = wx.REMOVE_LEADING_SPACES)
         self.centerpanel = self.newPanel(vizpanel)
         self.centerpanel.SetSizer(self.cbuttonssizer)
-        viz_pane.Add(self.centerpanel, 0, flag = wx.ALIGN_CENTER)
+        viz_pane.Add(self.centerpanel, 0, flag = wx.ALIGN_CENTER | wx.TOP,
+                     border=get_space("mini"))
         vizpanel.SetSizer(viz_pane)
         if compact:
             log_pane = LogPane(self, logpanel)
@@ -270,11 +274,13 @@ class MainWindow(wx.Frame):
             left_pane.parentsizers.append(self.splitterwindow)
         logpanel.SetSizer(log_pane)
         if compact:
-            left_sizer.Add(logpanel, 1, wx.EXPAND)
+            left_sizer.Add(logpanel, 1, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM,
+                           border = get_space("mini"))
             self.lowersizer.Add(vizpanel, 1, wx.EXPAND)
         else:
             self.lowersizer.Add(rightpanel, 1, wx.EXPAND)
-        self.mainsizer.Add(upperpanel, 0, wx.EXPAND)
+        self.mainsizer.Add(upperpanel, 0, wx.EXPAND | wx.ALL,
+                           border = get_space("mini"))
         self.mainsizer.Add(lowerpanel, 1, wx.EXPAND)
         self.panel.SetSizer(self.mainsizer)
         self.panel.Bind(wx.EVT_MOUSE_EVENTS, self.editbutton)
