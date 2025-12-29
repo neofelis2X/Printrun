@@ -2153,7 +2153,8 @@ Printrun. If not, see <http://www.gnu.org/licenses/>."""
             if isinstance(self.cbuttonssizer, wx.GridBagSizer):
                 self.cbuttonssizer.Add(b, pos = (i // 4, i % 4), flag = wx.EXPAND)
             else:
-                self.cbuttonssizer.Add(b, flag = wx.EXPAND)
+                self.cbuttonssizer.Add(b, flag = wx.EXPAND | wx.LEFT | wx.BOTTOM,
+                                       border = get_space("mini") // 2)
         self.centerpanel.Layout()
         self.centerpanel.GetContainingSizer().Layout()
 

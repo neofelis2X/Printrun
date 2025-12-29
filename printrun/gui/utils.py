@@ -15,12 +15,13 @@
 
 import wx
 
-def make_button(parent, label, callback, tooltip, container = None, size = wx.DefaultSize, style = 0):
+def make_button(parent, label, callback, tooltip, container = None,
+                size = wx.DefaultSize, style = 0, flag = 0):
     button = wx.Button(parent, -1, label, style = style, size = size)
     button.Bind(wx.EVT_BUTTON, callback)
     button.SetToolTip(wx.ToolTip(tooltip))
     if container:
-        container.Add(button)
+        container.Add(button, flag = flag)
     return button
 
 def make_autosize_button(*args):
