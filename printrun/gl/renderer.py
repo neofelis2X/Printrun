@@ -19,7 +19,7 @@ import ctypes
 import numpy as np
 from pyglet.graphics import shader
 
-from pyglet.gl import GLfloat, GLuint, \
+from pyglet.gl import GLfloat, GLuint, GLsizeiptr, \
                       GL_ELEMENT_ARRAY_BUFFER, GL_FLOAT, GL_ARRAY_BUFFER, \
                       GL_STATIC_DRAW, GL_FALSE, GL_TRUE, GL_UNIFORM_BUFFER, \
                       GL_DYNAMIC_DRAW, \
@@ -264,7 +264,9 @@ def fill_buffer(buffer, data, kind) -> None:
     #print(type(data), data[:10], len(data))
     gl_array = get_gl_array(data)
     glBindBuffer(kind, buffer)
-    glBufferData(kind, ctypes.sizeof(gl_array), gl_array, GL_STATIC_DRAW)
+    # Orphan the buffer before refilling it
+    glBufferData(kind, GLsizeiptr(ctypes.sizeof(gl_array)), None, GL_STATIC_DRAW)
+    glBufferData(kind, GLsizeiptr(ctypes.sizeof(gl_array)), gl_array, GL_STATIC_DRAW)
 
 def get_gl_array(pylist):
     if isinstance(pylist[0], int):
