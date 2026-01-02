@@ -267,8 +267,7 @@ class GcodeViewMainWrapper(GcodeViewLoader, BaseViz):
         if self.model:
             for s in changed_settings:
                 if s.name.startswith('gcview_color_'):
-                    self.model.update_colors()
-                    break
+                    self.model.update_colors(color_name = s.name)
 
     def set_current_gline(self, gline) -> None:
         if gline.is_move and gline.gcview_end_vertex is not None \

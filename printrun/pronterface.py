@@ -1136,6 +1136,7 @@ Printrun. If not, see <http://www.gnu.org/licenses/>."""
         self.settings._add(ColorSetting("gcview_color_tool4", "#00FF8F99", _("3D view tool 4 moves color"), _("Color of print moves with tool 4 in 3D view"), "Colors"), self.update_gcview_colors)
         self.settings._add(ColorSetting("gcview_color_printed", "#33BF0099", _("3D view printed moves color"), _("Color of printed moves in 3D view"), "Colors"), self.update_gcview_colors)
         self.settings._add(ColorSetting("gcview_color_current", "#00E5FFCC", _("3D view current layer moves color"), _("Color of moves in current layer in 3D view"), "Colors"), self.update_gcview_colors)
+        self.settings._add(ColorSetting("gcview_color_current_travel", "#CC00FF99", _("3D view current travel moves color"), _("Color of travel moves in current layer in 3D view"), "Colors"), self.update_gcview_colors)
         self.settings._add(ColorSetting("gcview_color_current_printed", "#196600CC", _("3D view printed current layer moves color"), _("Color of already printed moves from current layer in 3D view"), "Colors"), self.update_gcview_colors)
         self.settings._add(StaticTextSetting("note1", _("Note:"), _("Changing some of these settings might require a restart to get effect"), group = "UI"))
         recentfilessetting = StringSetting("recentfiles", "[]")
