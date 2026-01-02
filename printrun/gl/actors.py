@@ -24,13 +24,14 @@ import threading
 import numpy as np
 from abc import ABC, abstractmethod
 
-from ctypes import sizeof
+from ctypes import sizeof, cast, c_void_p
 
-from pyglet.gl import GLfloat, GLuint, \
-                      GL_ARRAY_BUFFER, GL_ELEMENT_ARRAY_BUFFER, \
+from pyglet.gl import GLfloat, GLuint, GLintptr, GLsizeiptr, \
+                      GL_ARRAY_BUFFER, GL_ELEMENT_ARRAY_BUFFER, GL_MAP_WRITE_BIT, \
                       GL_UNSIGNED_INT, GL_TRIANGLES, GL_LINES, GL_CULL_FACE, \
                       glEnable, glDisable, glDrawArrays, glDrawElements, \
-                      glDrawRangeElements, glBindVertexArray
+                      glDrawRangeElements, glBindVertexArray, glMapBufferRange, \
+                      glUnmapBuffer
 
 from .mathutils import mat4_translation, mat4_rotation, mat4_scaling
 
@@ -697,24 +698,22 @@ class Model(ActorBaseClass):
     """
     Parent class for models that provides common functionality.
     """
-    AXIS_X = (1, 0, 0)
-    AXIS_Y = (0, 1, 0)
-    AXIS_Z = (0, 0, 1)
+    display_travels = True
 
-    letter_axis_map = {
-        'x': AXIS_X,
-        'y': AXIS_Y,
-        'z': AXIS_Z,
-    }
+    buffers_created = False
+    loaded = False
+    fully_loaded = False
 
-    color_tool0 = (1.0, 0.0, 0.0, 1.0)
-    color_tool1 = (1.0, 0.0, 0.0, 1.0)
-    color_tool2 = (1.0, 0.0, 0.0, 1.0)
-    color_tool3 = (1.0, 0.0, 0.0, 1.0)
-    color_tool4 = (1.0, 0.0, 0.0, 1.0)
-    color_travel = (1.0, 0.0, 0.0, 1.0)
-
-    axis_letter_map = {(v, k) for k, v in letter_axis_map.items()}
+    color_travel =  (0.8, 0.8, 0.8, 1.0)
+    color_tool0 =   (1.0, 0.0, 0.0, 1.0)
+    color_tool1 =   (0.67, 0.05, 0.9, 1.0)
+    color_tool2 =   (1.0, 0.8, 0.0, 1.0)
+    color_tool3 =   (1.0, 0.0, 0.62, 1.0)
+    color_tool4 =   (0.0, 1.0, 0.58, 1.0)
+    color_printed = (0.2, 0.75, 0.0, 1.0)
+    color_current = (0.0, 0.9, 1.0, 1.0)
+    color_current_printed = (0.1, 0.4, 0, 1.0)
+    color_current_travel =  (0.8, 0.0, 1.0, 1.0)
 
     lock = threading.Lock()
 
@@ -873,25 +872,6 @@ class GcodeModel(Model):
     """
     Model for displaying Gcode data.
     """
-
-    color_travel =  (0.8, 0.8, 0.8, 1.0)
-    color_tool0 =   (1.0, 0.0, 0.0, 1.0)
-    color_tool1 =   (0.67, 0.05, 0.9, 1.0)
-    color_tool2 =   (1.0, 0.8, 0.0, 1.0)
-    color_tool3 =   (1.0, 0.0, 0.62, 1.0)
-    color_tool4 =   (0.0, 1.0, 0.58, 1.0)
-    color_printed = (0.2, 0.75, 0.0, 1.0)
-    color_current = (0.0, 0.9, 1.0, 1.0)
-    color_current_printed = (0.1, 0.4, 0, 1.0)
-    # TODO: Add this color to settings
-    color_current_travel =  (0.8, 0.0, 1.0, 1.0)
-
-    display_travels = True
-
-    buffers_created = False
-    loaded = False
-    fully_loaded = False
-
     path_halfwidth = 0.2
     path_halfheight = 0.2
 
@@ -901,9 +881,10 @@ class GcodeModel(Model):
         self.count_print_indices = [0]
         self.count_print_vertices = [0]
 
+        self.attribute_count = 0
+        self.vertices_elem_count = {"print": 0, "travel": 0}
         self.travels = np.zeros(0, dtype = GLfloat)
         self.indices = np.zeros(0, dtype = GLuint)
-        self.travels_offset = 0
 
     def set_path_size(self, path_halfwidth: float, path_halfheight: float) -> None:
         with self.lock:
@@ -928,16 +909,16 @@ class GcodeModel(Model):
         coordspervertex = 3  # xyz components
         buffered_color_len = 4  # rgba components
         # xyz position + rgba color + xyz normal vector per vertex
-        bufferlen_per_vertex = 2 * coordspervertex + buffered_color_len
+        self.attribute_count = 2 * coordspervertex + buffered_color_len
         verticesperline = 2 * 4  # each end of the line has 4 vertices
 
         def coords_count(line_count: int) -> int:
-            return line_count * verticesperline * bufferlen_per_vertex
+            return line_count * verticesperline * self.attribute_count
 
         def travel_coords_count(line_count: int) -> int:
             travelverticesperline = 2
             # Normals are included to keep the memory layout the same
-            return line_count * travelverticesperline * bufferlen_per_vertex
+            return line_count * travelverticesperline * self.attribute_count
 
         trianglesperface = 2
         facesperbox = 4
@@ -985,8 +966,8 @@ class GcodeModel(Model):
                 remaining_lines = nlines - processed_lines
                 # Only reallocate memory which might be needed, not memory
                 # for everything
-                ncoords = coords_count(remaining_lines) + vertex_k * bufferlen_per_vertex
-                ntravelcoords = travel_coords_count(remaining_lines) + travel_vertex_k * bufferlen_per_vertex
+                ncoords = coords_count(remaining_lines) + vertex_k * self.attribute_count
+                ntravelcoords = travel_coords_count(remaining_lines) + travel_vertex_k * self.attribute_count
                 nindices = indices_count(remaining_lines) + index_k
                 if ncoords > vertices.size:
                     self.vertices.resize(ncoords, refcheck = False)
@@ -1004,7 +985,7 @@ class GcodeModel(Model):
                     has_movement = True
                     for (current_pos, interpolated) in interpolate_arcs(gline, prev_gline):
                         if not gline.extruding:
-                            if self.travels.size < (travel_vertex_k * bufferlen_per_vertex + 2 * bufferlen_per_vertex):
+                            if self.travels.size < (travel_vertex_k * self.attribute_count + 2 * self.attribute_count):
                                 # arc interpolation extra points allocation
                                 # if the array is full, extend its size by +50%
                                 logging.debug(_("GL: Reallocate GCode travel buffer %d -> %d") % \
@@ -1013,7 +994,7 @@ class GcodeModel(Model):
                                 self.travels.resize(int(self.travels.size * 1.5),
                                                     refcheck = False)
 
-                            buff_idx = travel_vertex_k * bufferlen_per_vertex
+                            buff_idx = travel_vertex_k * self.attribute_count
                             travel_vertices[buff_idx : buff_idx + 3] = prev_pos
                             travel_vertices[buff_idx + 3 : buff_idx + 10] = travel_attributes
                             travel_vertices[buff_idx + 10 : buff_idx + 13] = current_pos
@@ -1154,12 +1135,12 @@ class GcodeModel(Model):
                             new_vertices_len = len(new_vertices)
                             gline_color = self.movement_color(gline)[:buffered_color_len]
 
-                            buff_idx = vertex_k * bufferlen_per_vertex
+                            buff_idx = vertex_k * self.attribute_count
                             for i in range(0, new_vertices_len, 3):
                                 vertices[buff_idx : buff_idx + 3] = new_vertices[i : i + 3]
                                 vertices[buff_idx + 3 : buff_idx + 7] = gline_color
                                 vertices[buff_idx + 7 : buff_idx + 10] = new_normals[i : i + 3]
-                                buff_idx += bufferlen_per_vertex
+                                buff_idx += self.attribute_count
 
                             vertex_k += new_vertices_len // 3
                             prev_move_normal_x = move_normal_x
@@ -1197,8 +1178,8 @@ class GcodeModel(Model):
                          (model_data.ymin, model_data.ymax, model_data.depth),
                          (model_data.zmin, model_data.zmax, model_data.height))
 
-            self.vertices.resize(vertex_k * bufferlen_per_vertex, refcheck = False)
-            self.travels.resize(travel_vertex_k * bufferlen_per_vertex, refcheck = False)
+            self.vertices.resize(vertex_k * self.attribute_count, refcheck = False)
+            self.travels.resize(travel_vertex_k * self.attribute_count, refcheck = False)
             self.indices.resize(index_k, refcheck = False)
 
             self.layer_stops = array.array('L', self.layer_stops)
@@ -1215,7 +1196,7 @@ class GcodeModel(Model):
         t_end = time.time()
 
         logging.debug(_('GL: Initialized GCode model in %.2f seconds') % (t_end - t_start))
-        logging.debug(_('GL: GCode model vertex count: %d') % ((len(self.vertices) + len(self.travels)) // 10))
+        logging.debug(_('GL: GCode model vertex count: %d') % ((len(self.vertices) + len(self.travels)) // self.attribute_count))
         yield None
 
     def copy(self) -> 'GcodeModel':
@@ -1226,31 +1207,52 @@ class GcodeModel(Model):
                     "layer_idxs_map", "count_travel_indices",
                     "count_print_indices", "count_print_vertices",
                     "path_halfwidth", "path_halfheight",
-                    "gcode"]:
+                    "gcode", "attribute_count"]:
             setattr(copy, var, getattr(self, var))
         copy.loaded = True
         copy.fully_loaded = True
         copy.initialized = False
         return copy
 
-    def update_colors(self) -> None:
-        """Rebuild gl color buffer without loading. Used after color settings edit"""
-        ncoords = self.count_print_vertices[-1]
-        colors = np.empty(ncoords * 4, dtype = GLfloat)
-        cur_vertex = 0
-        gline_i = 1
-        for gline in self.gcode.lines:
-            if gline.gcview_end_vertex:
-                gline_color = self.movement_color(gline)[:3]
-                last_vertex = self.count_print_vertices[gline_i]
-                gline_i += 1
-                while cur_vertex < last_vertex:
-                    colors[cur_vertex * 3 : cur_vertex * 3 + 3] = gline_color
-                    cur_vertex += 1
-        #if self.colors:
-        #    pass
-            #self.vertex_color_buffer.delete()
-        # TODO: Find a solution to update the colors
+    def update_colors(self, color_name: str) -> None:
+        """Rebuild gl color buffer without reloading. Used after color settings edit"""
+        xyz_coord_offset = 3
+
+        # INFO: We can only live-update the colour of tool0 and travels, other
+        # tools are not implemented. Just reload the whole model in this case.
+        if color_name.endswith("tool0"):
+            offset = xyz_coord_offset * sizeof(GLfloat)  # Offset is in actual BYTES of memory
+            size = self.vertices_elem_count["print"]  # Why is this in ELEMENTS and not in BYTES?
+            color = self.color_tool0
+        elif color_name.endswith("r_travel"):
+            offset = (xyz_coord_offset + self.vertices_elem_count["print"]) * sizeof(GLfloat)
+            size = self.vertices_elem_count["travel"]
+            color = self.color_travel
+        else:
+            return
+
+        glBindVertexArray(self.vao)
+        buffer_ptr = glMapBufferRange(GL_ARRAY_BUFFER,
+                                      GLintptr(offset),
+                                      GLsizeiptr(size),
+                                      GL_MAP_WRITE_BIT)
+        address = cast(buffer_ptr, c_void_p).value
+
+        if not address:
+            logging.error("glMapBuffer failed")
+            glUnmapBuffer(GL_ARRAY_BUFFER)
+            return
+
+        array = GLfloat * size
+        mapped_buffer = array.from_address(address)
+
+        for vtx in range(0, size, self.attribute_count):
+            mapped_buffer[vtx + 0] = GLfloat(color[0])
+            mapped_buffer[vtx + 1] = GLfloat(color[1])
+            mapped_buffer[vtx + 2] = GLfloat(color[2])
+            mapped_buffer[vtx + 3] = GLfloat(color[3])
+
+        glUnmapBuffer(GL_ARRAY_BUFFER)
 
     # ------------------------------------------------------------------------
     # DRAWING
@@ -1271,12 +1273,8 @@ class GcodeModel(Model):
             else:
                 glBindVertexArray(self.vao)
 
-            # TODO:
-            # Create Buffer big enough for the whole model (size known?)
-            # Fill data incremental, use offsets
-            # When all model data loaded, add travel data
-
-            self.travels_offset = self.vertices.size // 10
+            self.vertices_elem_count["print"] = self.vertices.size
+            self.vertices_elem_count["travel"] = self.travels.size
             vb_all = np.concatenate((self.vertices, self.travels))
 
             renderer.fill_buffer(self.vbo, vb_all, GL_ARRAY_BUFFER)
@@ -1301,6 +1299,7 @@ class GcodeModel(Model):
 
     def _display_travels(self) -> None:
         sid = self.shaderlist["lines"].id
+        travels_offset = self.vertices_elem_count["print"] // self.attribute_count
         # Prevent race condition by using the number of currently loaded layers
         max_layers = self.layers_loaded
         end = self.layer_stops[min(self.num_layers_to_draw, max_layers)]
@@ -1315,7 +1314,7 @@ class GcodeModel(Model):
             renderer.load_uniform(sid, "u_oColor",
                                   self.color_current_travel)
 
-            glDrawArrays(GL_LINES, self.travels_offset + start_index,
+            glDrawArrays(GL_LINES, travels_offset + start_index,
                          end_index - start_index + 1)
 
             renderer.load_uniform(sid, "u_OverwriteColor", False)
@@ -1323,7 +1322,7 @@ class GcodeModel(Model):
 
         # Draw all other visible travels
         if not self.only_current:
-            glDrawArrays(GL_LINES, self.travels_offset, end_index - 1)
+            glDrawArrays(GL_LINES, travels_offset, end_index - 1)
 
     def _draw_elements(self, start: int, end: int, draw_type = GL_TRIANGLES) -> None:
         # Don't attempt printing empty layer
@@ -1394,24 +1393,6 @@ class GcodeModelLight(Model):
     """
     Model for displaying Gcode data as lines.
     """
-
-    color_travel =  (0.8, 0.8, 0.8, 1.0)
-    color_tool0 =   (0.85, 0.0, 0.0, 0.6)
-    color_tool1 =   (0.67, 0.05, 0.9, 0.6)
-    color_tool2 =   (1.0, 0.8, 0.0, 0.6)
-    color_tool3 =   (1.0, 0.0, 0.62, 0.6)
-    color_tool4 =   (0.0, 1.0, 0.58, 0.6)
-    color_printed = (0.15, 0.65, 0.0, 1.0)
-    color_current = (0.0, 0.9, 1.0, 1.0)
-    color_current_printed = (0.1, 0.4, 0.0, 1.0)
-    # TODO: Add this color to settings
-    color_current_travel =  (0.8, 0.0, 1.0, 1.0)
-
-    display_travels = True
-
-    buffers_created = False
-    loaded = False
-    fully_loaded = False
 
     def __init__(self):
         super().__init__()
@@ -1549,7 +1530,7 @@ class GcodeModelLight(Model):
         logging.debug(_('GL: GCode model lite vertex count: %d') % (len(self.vertices) // bufferlen_per_vertex))
         yield None
 
-    def update_colors(self) -> None:
+    def update_colors(self, color_name: str) -> None:
         pass
 
     def copy(self) -> 'GcodeModelLight':
