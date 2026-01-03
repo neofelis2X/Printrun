@@ -23,7 +23,6 @@ import wx
 from . import gcoder
 from .gl.panel import wxGLPanel
 from .gl import actors
-from .gl import renderer
 from .injectgcode import injector, injector_edit
 
 from .gviz import GvizBaseFrame, BaseViz
@@ -267,7 +266,16 @@ class GcodeViewMainWrapper(GcodeViewLoader, BaseViz):
         if self.model:
             for s in changed_settings:
                 if s.name.startswith('gcview_color_'):
+                    self.glpanel.set_current_context()
                     self.model.update_colors(color_name = s.name)
+                    if hasattr(self.root, "gwindow") and \
+                        self.root.gwindow.IsShown():
+
+                        setattr(self.root.gwindow.model, s.name[7:],
+                                getattr(self.model, s.name[7:]))
+                        self.root.gwindow.glpanel.set_current_context()
+                        self.root.gwindow.model.update_colors(color_name = s.name)
+                        self.root.gwindow.glpanel.Refresh()
 
     def set_current_gline(self, gline) -> None:
         if gline.is_move and gline.gcview_end_vertex is not None \
@@ -277,6 +285,7 @@ class GcodeViewMainWrapper(GcodeViewLoader, BaseViz):
                 self.refresh_timer.Start()
 
     def update_actor_colours(self, colour: Tuple[float, float, float]) -> None:
+        self.glpanel.set_current_context()
         self.glpanel.focus.update_colour(colour)
         self.glpanel.platform.update_colour(colour)
 
