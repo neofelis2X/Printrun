@@ -24,14 +24,13 @@ import threading
 import numpy as np
 from abc import ABC, abstractmethod
 
-from ctypes import sizeof, cast, c_void_p
+from ctypes import sizeof
 
-from pyglet.gl import GLfloat, GLuint, GLintptr, GLsizeiptr, \
-                      GL_ARRAY_BUFFER, GL_ELEMENT_ARRAY_BUFFER, GL_MAP_WRITE_BIT, \
+from pyglet.gl import GLfloat, GLuint, \
+                      GL_ARRAY_BUFFER, GL_ELEMENT_ARRAY_BUFFER, \
                       GL_UNSIGNED_INT, GL_TRIANGLES, GL_LINES, GL_CULL_FACE, \
                       glEnable, glDisable, glDrawArrays, glDrawElements, \
-                      glDrawRangeElements, glBindVertexArray, glMapBufferRange, \
-                      glUnmapBuffer
+                      glDrawRangeElements, glBindVertexArray
 
 from .mathutils import mat4_translation, mat4_rotation, mat4_scaling
 
@@ -1221,38 +1220,23 @@ class GcodeModel(Model):
         # INFO: We can only live-update the colour of tool0 and travels, other
         # tools are not implemented. Just reload the whole model in this case.
         if color_name.endswith("tool0"):
-            offset = xyz_coord_offset * sizeof(GLfloat)  # Offset is in actual BYTES of memory
-            size = self.vertices_elem_count["print"]  # Why is this in ELEMENTS and not in BYTES?
+            offset = xyz_coord_offset
+            size = self.vertices_elem_count["print"]
             color = self.color_tool0
         elif color_name.endswith("r_travel"):
-            offset = (xyz_coord_offset + self.vertices_elem_count["print"]) * sizeof(GLfloat)
+            offset = xyz_coord_offset + self.vertices_elem_count["print"]
             size = self.vertices_elem_count["travel"]
             color = self.color_travel
         else:
             return
 
-        glBindVertexArray(self.vao)
-        buffer_ptr = glMapBufferRange(GL_ARRAY_BUFFER,
-                                      GLintptr(offset),
-                                      GLsizeiptr(size),
-                                      GL_MAP_WRITE_BIT)
-        address = cast(buffer_ptr, c_void_p).value
-
-        if not address:
-            logging.error("glMapBuffer failed")
-            glUnmapBuffer(GL_ARRAY_BUFFER)
-            return
-
-        array = GLfloat * size
-        mapped_buffer = array.from_address(address)
-
-        for vtx in range(0, size, self.attribute_count):
-            mapped_buffer[vtx + 0] = GLfloat(color[0])
-            mapped_buffer[vtx + 1] = GLfloat(color[1])
-            mapped_buffer[vtx + 2] = GLfloat(color[2])
-            mapped_buffer[vtx + 3] = GLfloat(color[3])
-
-        glUnmapBuffer(GL_ARRAY_BUFFER)
+        with renderer.MapBufferRange(self.vao, offset, size) as mapped_buffer:
+            if mapped_buffer:
+                for vtx in range(0, size, self.attribute_count):
+                    mapped_buffer[vtx + 0] = GLfloat(color[0])
+                    mapped_buffer[vtx + 1] = GLfloat(color[1])
+                    mapped_buffer[vtx + 2] = GLfloat(color[2])
+                    mapped_buffer[vtx + 3] = GLfloat(color[3])
 
     # ------------------------------------------------------------------------
     # DRAWING
