@@ -1206,7 +1206,7 @@ class GcodeModel(Model):
                     "layer_idxs_map", "count_travel_indices",
                     "count_print_indices", "count_print_vertices",
                     "path_halfwidth", "path_halfheight",
-                    "gcode", "attribute_count"]:
+                    "gcode", "attribute_count", "vertices_elem_count"]:
             setattr(copy, var, getattr(self, var))
         copy.loaded = True
         copy.fully_loaded = True
