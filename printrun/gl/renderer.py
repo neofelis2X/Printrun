@@ -19,21 +19,58 @@ import ctypes
 import numpy as np
 from pyglet.graphics import shader
 
-from pyglet.gl import GLfloat, GLuint, GLsizeiptr, \
+from pyglet.gl import GLfloat, GLuint, GLintptr, GLsizeiptr, \
                       GL_ELEMENT_ARRAY_BUFFER, GL_FLOAT, GL_ARRAY_BUFFER, \
                       GL_STATIC_DRAW, GL_FALSE, GL_TRUE, GL_UNIFORM_BUFFER, \
-                      GL_DYNAMIC_DRAW, \
+                      GL_DYNAMIC_DRAW, GL_MAP_WRITE_BIT, \
                       glGenVertexArrays, glBindVertexArray, glGenBuffers, \
                       glBindBuffer, glBufferData, glEnableVertexAttribArray, \
                       glVertexAttribPointer, glGetUniformLocation, \
                       glUniformMatrix4fv, glUniform1i, glUniform1f, glUniform4f, \
                       glUniform3f, glGetUniformBlockIndex, glBindBufferRange, \
-                      glUniformBlockBinding, glBufferSubData, glUniformMatrix3fv
+                      glUniformBlockBinding, glBufferSubData, glUniformMatrix3fv, \
+                      glMapBufferRange, glUnmapBuffer
 
 # for type hints
 from typing import Optional, Dict, List
 
 SRC_SHADER_DIR = Path("printrun/assets/shader/")
+
+
+class MapBufferRange:
+    def __init__(self, vao: GLuint, offset: int, size: int):
+        self.vao = vao
+        self.offset = offset
+        self.size = size
+
+    def __enter__(self) -> Optional[ctypes.Array]:
+        glBindVertexArray(self.vao)
+        # INFO: offset is given as actual BYTES in memory, as expected
+        # size instead is given as elements (of 4 bytes, GLfloat), maybe a quirk of pyglet?
+        buffer_ptr = glMapBufferRange(GL_ARRAY_BUFFER,
+                                      GLintptr(self.offset * ctypes.sizeof(GLfloat)),
+                                      GLsizeiptr(self.size),
+                                      GL_MAP_WRITE_BIT)
+        address = ctypes.cast(buffer_ptr, ctypes.c_void_p).value
+
+        if not address:
+            logging.error("glMapBuffer failed")
+            return None
+
+        array = GLfloat * self.size
+        return array.from_address(address)
+
+    def __exit__(self, exc_type, exc_value, exc_traceback) -> bool:
+        result = glUnmapBuffer(GL_ARRAY_BUFFER)
+        if not result:
+            logging.warning("glUnmapBuffer did not return successfully. Please consider reloading the model.")
+
+        if exc_type:
+            logging.error(exc_type, exc_value)
+            logging.error("Traceback: ", exc_traceback)
+            return True
+
+        return False
 
 
 def load_shader() -> Optional[Dict[str, shader.ShaderProgram]]:
