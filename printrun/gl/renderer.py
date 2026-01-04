@@ -22,7 +22,7 @@ from pyglet.graphics import shader
 from pyglet.gl import GLfloat, GLuint, GLintptr, GLsizeiptr, \
                       GL_ELEMENT_ARRAY_BUFFER, GL_FLOAT, GL_ARRAY_BUFFER, \
                       GL_STATIC_DRAW, GL_FALSE, GL_TRUE, GL_UNIFORM_BUFFER, \
-                      GL_DYNAMIC_DRAW, GL_MAP_WRITE_BIT, \
+                      GL_DYNAMIC_DRAW, GL_MAP_WRITE_BIT, GL_MAP_READ_BIT, \
                       glGenVertexArrays, glBindVertexArray, glGenBuffers, \
                       glBindBuffer, glBufferData, glEnableVertexAttribArray, \
                       glVertexAttribPointer, glGetUniformLocation, \
@@ -32,42 +32,46 @@ from pyglet.gl import GLfloat, GLuint, GLintptr, GLsizeiptr, \
                       glMapBufferRange, glUnmapBuffer
 
 # for type hints
-from typing import Optional, Dict, List
+from typing import Optional, Dict
 
 SRC_SHADER_DIR = Path("printrun/assets/shader/")
 
 
 class MapBufferRange:
-    def __init__(self, vao: GLuint, offset: int, size: int):
+    def __init__(self, vao: GLuint, offset: int, size: int,
+                 index_buffer: bool = False, read: bool = False):
         self.vao = vao
         self.offset = offset
         self.size = size
+        self.target = GL_ELEMENT_ARRAY_BUFFER if index_buffer else GL_ARRAY_BUFFER
+        self.access = GL_MAP_READ_BIT if read else GL_MAP_WRITE_BIT
+        self.elementtype = GLuint if index_buffer else GLfloat
 
-    def __enter__(self) -> Optional[ctypes.Array]:
+    def __enter__(self) -> Optional[np.ndarray]:
         glBindVertexArray(self.vao)
         # INFO: offset is given as actual BYTES in memory, as expected
-        # size instead is given as elements (of 4 bytes, GLfloat), maybe a quirk of pyglet?
-        buffer_ptr = glMapBufferRange(GL_ARRAY_BUFFER,
-                                      GLintptr(self.offset * ctypes.sizeof(GLfloat)),
+        # size instead is given as elements (GLfloat or GLuint), maybe a quirk of pyglet?
+        buffer_ptr = glMapBufferRange(self.target,
+                                      GLintptr(self.offset * ctypes.sizeof(self.elementtype)),
                                       GLsizeiptr(self.size),
-                                      GL_MAP_WRITE_BIT)
-        address = ctypes.cast(buffer_ptr, ctypes.c_void_p).value
+                                      self.access)
 
-        if not address:
+        if not buffer_ptr:
             logging.error("glMapBuffer failed")
             return None
 
-        array = GLfloat * self.size
-        return array.from_address(address)
+        float_ptr = ctypes.cast(buffer_ptr, ctypes.POINTER(self.elementtype))
+
+        return np.ctypeslib.as_array(float_ptr, shape=(self.size,))
 
     def __exit__(self, exc_type, exc_value, exc_traceback) -> bool:
-        result = glUnmapBuffer(GL_ARRAY_BUFFER)
+        result = glUnmapBuffer(self.target)
         if not result:
             logging.warning("glUnmapBuffer did not return successfully. Please consider reloading the model.")
 
         if exc_type:
-            logging.error(exc_type, exc_value)
-            logging.error("Traceback: ", exc_traceback)
+            logging.exception("Error in MapBufferRange",
+                              exc_info=(exc_type, exc_value, exc_traceback))
             return True
 
         return False
