@@ -1231,12 +1231,12 @@ class GcodeModel(Model):
             return
 
         with renderer.MapBufferRange(self.vao, offset, size) as mapped_buffer:
-            if mapped_buffer:
+            if mapped_buffer is not None:
                 for vtx in range(0, size, self.attribute_count):
-                    mapped_buffer[vtx + 0] = GLfloat(color[0])
-                    mapped_buffer[vtx + 1] = GLfloat(color[1])
-                    mapped_buffer[vtx + 2] = GLfloat(color[2])
-                    mapped_buffer[vtx + 3] = GLfloat(color[3])
+                    mapped_buffer[vtx + 0] = color[0]
+                    mapped_buffer[vtx + 1] = color[1]
+                    mapped_buffer[vtx + 2] = color[2]
+                    mapped_buffer[vtx + 3] = color[3]
 
     # ------------------------------------------------------------------------
     # DRAWING
@@ -1381,9 +1381,10 @@ class GcodeModelLight(Model):
     def __init__(self):
         super().__init__()
 
-        self.travels = np.zeros(0, dtype = GLfloat)
         self.indices = np.zeros(0, dtype = GLuint)
-        self.travel_index_offset = 0
+        self.travel_indices = np.zeros(0, dtype = GLuint)
+        self.attribute_count = 0
+        self.vertices_elem_count = {"print": 0, "printindex": 0, "travelindex": 0}
 
     def load_data(self, model_data: gcoder.GCode,
                   callback = None) -> Iterator[Union[int, None]]:
@@ -1392,16 +1393,17 @@ class GcodeModelLight(Model):
 
         coords_per_vertex = 3  # xyz
         channels_per_color = 4  # rgba
-        bufferlen_per_vertex = coords_per_vertex + channels_per_color
+        self.attribute_count = coords_per_vertex + channels_per_color
         vertices_per_line = 2
-        bufferlen_per_line = vertices_per_line * bufferlen_per_vertex
+        bufferlen_per_line = vertices_per_line * self.attribute_count
         nlines = len(model_data)
 
         vertices = self.vertices = np.zeros(nlines * bufferlen_per_line,
                                             dtype = GLfloat)
         indices = self.indices = np.zeros(nlines * vertices_per_line,
                                           dtype = GLuint)
-        travel_indices = self.travels = []
+        travel_indices = self.travel_indices = np.zeros(nlines * vertices_per_line,
+                                          dtype = GLuint)
         vertex_k = 0
         index_k = 0
         travel_index_k = 0
@@ -1425,6 +1427,8 @@ class GcodeModelLight(Model):
                                          refcheck = False)
                     self.indices.resize(nlines * vertices_per_line,
                                          refcheck = False)
+                    self.travel_indices.resize(nlines * vertices_per_line,
+                                         refcheck = False)
                 layer = model_data.all_layers[layer_idx]
                 has_movement = False
                 for gline in layer:
@@ -1436,7 +1440,8 @@ class GcodeModelLight(Model):
                     has_movement = True
                     for (current_pos, interpolated) in interpolate_arcs(gline, prev_gline):
 
-                        if self.indices.size < (index_k * vertices_per_line + 2 * vertices_per_line):
+                        if self.indices.size < ((index_k + 2) * vertices_per_line) or \
+                            self.travel_indices.size < ((travel_index_k + 2) * vertices_per_line):
                             # arc interpolation extra points allocation
                             # if the array is full, extend its size by +50%
                             ratio = 1.5
@@ -1447,8 +1452,10 @@ class GcodeModelLight(Model):
                                                  refcheck = False)
                             self.indices.resize(int(self.indices.size * ratio),
                                                  refcheck = False)
+                            self.travel_indices.resize(int(self.travel_indices.size * ratio),
+                                                 refcheck = False)
 
-                        buff_idx = vertex_k * bufferlen_per_vertex
+                        buff_idx = vertex_k * self.attribute_count
                         vertex_color = self.movement_color(gline)
 
                         # only add two new vertices when the color is different
@@ -1465,8 +1472,8 @@ class GcodeModelLight(Model):
                             vertex_k += 2
 
                         if not gline.extruding:
-                            travel_indices.append(vertex_k - 2)
-                            travel_indices.append(vertex_k - 1)
+                            travel_indices[travel_index_k] = vertex_k - 2
+                            travel_indices[travel_index_k + 1] = vertex_k - 1
                             travel_index_k += 2
                         else:
                             indices[index_k] = vertex_k - 2
@@ -1498,9 +1505,10 @@ class GcodeModelLight(Model):
                          (model_data.ymin, model_data.ymax, model_data.depth),
                          (model_data.zmin, model_data.zmax, model_data.height))
 
-            self.vertices.resize(vertex_k * bufferlen_per_vertex,
+            self.vertices.resize(vertex_k * self.attribute_count,
                                  refcheck = False)
             self.indices.resize(index_k, refcheck = False)
+            self.travel_indices.resize(travel_index_k, refcheck = False)
 
             self.max_layers = len(self.layer_stops) - 1
             self.num_layers_to_draw = self.max_layers + 1
@@ -1511,24 +1519,59 @@ class GcodeModelLight(Model):
         t_end = time.time()
 
         logging.debug(_('GL: Initialized GCode model lite in %.2f seconds') % (t_end - t_start))
-        logging.debug(_('GL: GCode model lite vertex count: %d') % (len(self.vertices) // bufferlen_per_vertex))
+        logging.debug(_('GL: GCode model lite vertex count: %d') % (self.vertices.size // self.attribute_count))
         yield None
-
-    def update_colors(self, color_name: str) -> None:
-        pass
 
     def copy(self) -> 'GcodeModelLight':
         copy = GcodeModelLight()
-        for var in ["vertices", "indices", "travels", "max_layers",
-                    "layer_stops_travels", "travel_index_offset",
-                    "num_layers_to_draw", "printed_until",
-                    "layer_stops", "dims", "only_current",
-                    "layer_idxs_map", "gcode"]:
+        for var in ["vertices", "indices", "travel_indices", "max_layers",
+                    "layer_stops_travels", "num_layers_to_draw", "printed_until",
+                    "layer_stops", "dims", "only_current", "layer_idxs_map",
+                    "gcode", "attribute_count", "vertices_elem_count"]:
             setattr(copy, var, getattr(self, var))
         copy.loaded = True
         copy.fully_loaded = True
         copy.initialized = False
         return copy
+
+    def update_colors(self, color_name: str) -> None:
+        """Rebuild gl color buffer without reloading. Used after color settings edit"""
+        xyz_coord_offset = 3
+
+        # INFO: We can only live-update the colour of tool0 and travels, other
+        # tools are not implemented. Just reload the whole model in this case.
+        if color_name.endswith("tool0"):
+            i_offset = 0
+            i_size = self.vertices_elem_count["printindex"]
+            offset = xyz_coord_offset
+            size = self.vertices_elem_count["print"]
+            color = self.color_tool0
+        elif color_name.endswith("r_travel"):
+            i_offset = self.vertices_elem_count["printindex"]
+            i_size = self.vertices_elem_count["travelindex"]
+            offset = xyz_coord_offset
+            size = self.vertices_elem_count["print"]
+            color = self.color_travel
+        else:
+            return
+
+        unique_indices = None
+        with renderer.MapBufferRange(self.vao, i_offset, i_size,
+                                     index_buffer=True, read=True) as index_buffer:
+            if index_buffer is not None:
+                unique_indices = np.unique(index_buffer)
+
+        if unique_indices is None:
+            return
+
+        with renderer.MapBufferRange(self.vao, offset, size) as mapped_buffer:
+            if mapped_buffer is not None:
+                for idx in unique_indices:
+                    attr_idx = int(idx) * self.attribute_count
+                    mapped_buffer[attr_idx + 0] = color[0]
+                    mapped_buffer[attr_idx + 1] = color[1]
+                    mapped_buffer[attr_idx + 2] = color[2]
+                    mapped_buffer[attr_idx + 3] = color[3]
 
     # ------------------------------------------------------------------------
     # DRAWING
@@ -1548,8 +1591,10 @@ class GcodeModelLight(Model):
             else:
                 glBindVertexArray(self.vao)
 
-            self.travel_index_offset = self.indices.size
-            indices_all = np.concatenate((self.indices, self.travels))
+            self.vertices_elem_count["print"] = self.vertices.size
+            self.vertices_elem_count["printindex"] = self.indices.size
+            self.vertices_elem_count["travelindex"] = self.travel_indices.size
+            indices_all = np.concatenate((self.indices, self.travel_indices))
             renderer.fill_buffer(self.vbo, self.vertices, GL_ARRAY_BUFFER)
             renderer.fill_buffer(self.ebo,
                                  indices_all.data, GL_ELEMENT_ARRAY_BUFFER)
@@ -1558,6 +1603,7 @@ class GcodeModelLight(Model):
                 # Delete numpy arrays after creating VBOs after full load
                 self.vertices = np.zeros(0, dtype=GLfloat)
                 self.indices = np.zeros(0, dtype=GLuint)
+                self.travel_indices = np.zeros(0, dtype=GLuint)
 
     def draw(self) -> None:
         glBindVertexArray(self.vao)
@@ -1572,19 +1618,20 @@ class GcodeModelLight(Model):
 
     def _display_travels(self) -> None:
         sid = self.shaderlist["lines"].id
+        travel_index_offset = self.vertices_elem_count["printindex"]
         # Prevent race condition by using the number of currently loaded layers
         max_layers = self.layers_loaded
         current_index = min(self.num_layers_to_draw, max_layers)
 
-        start_index = self.travel_index_offset
-        end_index = self.travel_index_offset + \
+        start_index = travel_index_offset
+        end_index = travel_index_offset + \
                     self.layer_stops_travels[max_layers]
 
         # Draw current layer travels
         if self.num_layers_to_draw <= max_layers:
-            current_start = self.travel_index_offset + \
+            current_start = travel_index_offset + \
                             self.layer_stops_travels[current_index - 1]
-            current_end = self.travel_index_offset + \
+            current_end = travel_index_offset + \
                           self.layer_stops_travels[current_index]
 
             renderer.load_uniform(sid, "u_OverwriteColor", True)
@@ -1606,8 +1653,6 @@ class GcodeModelLight(Model):
 
 
     def _display_movements(self) -> None:
-
-
         sid = self.shaderlist["lines"].id
         # Prevent race condition by using the number of currently loaded layers
         max_layers = self.layers_loaded
