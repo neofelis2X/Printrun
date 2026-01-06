@@ -197,6 +197,10 @@ class GCObject:
         self.gcode: Optional[gcoder.GCode] = None
         self.dims = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 
+    def unload(self):
+        if self.model:
+            self.model.unload()
+
 
 class GcodeViewLoader:
 
@@ -252,6 +256,7 @@ class GcodeViewMainWrapper(GcodeViewLoader, BaseViz):
         self.p = self  # Hack for backwards compatibility with gviz API
         self.grid = grid
         self.model = None
+        self.obsolete_model = None
         self.objects = [GCObject(None)]
 
         if self.root and hasattr(self.root, "gcview_color_background"):
@@ -301,7 +306,9 @@ class GcodeViewMainWrapper(GcodeViewLoader, BaseViz):
             self.parent.model.num_layers_to_draw = viz_layer
             wx.CallAfter(self.Refresh)
 
-    def clear(self) -> None:
+    def clear(self, *args) -> None:
+        if self.model:
+            self.obsolete_model = self.model
         self.model: Optional[GCodeActor] = None
         self.objects[-1].model = None
         wx.CallAfter(self.Refresh)
@@ -332,6 +339,7 @@ class GcodeViewFrame(GvizBaseFrame, GcodeViewLoader):
                                       grid = grid, circular = circular,
                                       perspective = perspective)
         self.model = objects[0].model if objects else None
+        self.obsolete_model = None
         self.objects = [GCObject(None)]
 
         fit_image = wx.Image(imagefile('fit.png'), wx.BITMAP_TYPE_PNG).ConvertToBitmap()
@@ -419,6 +427,8 @@ class GcodeViewFrame(GvizBaseFrame, GcodeViewLoader):
         wx.CallAfter(self.Refresh)
 
     def clear(self) -> None:
+        if self.model:
+            self.obsolete_model = self.model
         self.model: Optional[GCodeActor] = None
         self.objects[-1].model = None
         wx.CallAfter(self.Refresh)

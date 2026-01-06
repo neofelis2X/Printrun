@@ -119,6 +119,10 @@ class ActorBaseClass(ABC):
     def load(self, shader, ubo) -> None:
         ...
 
+    def unload(self) -> None:
+        renderer.unload_buffers(self.vao, self.vbo, self.ebo)
+        print("UNLOADED MODEL")
+
     @abstractmethod
     def draw(self) -> None:
         ...
@@ -688,9 +692,6 @@ class MeshModel(ActorBaseClass):
 
         glBindVertexArray(self.vao)
         glDrawElements(GL_TRIANGLES, len(self.indices), GL_UNSIGNED_INT, 0)
-
-    def delete(self) -> None:
-        pass
 
 
 class Model(ActorBaseClass):

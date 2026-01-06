@@ -29,7 +29,8 @@ from pyglet.gl import GLfloat, GLuint, GLintptr, GLsizeiptr, \
                       glUniformMatrix4fv, glUniform1i, glUniform1f, glUniform4f, \
                       glUniform3f, glGetUniformBlockIndex, glBindBufferRange, \
                       glUniformBlockBinding, glBufferSubData, glUniformMatrix3fv, \
-                      glMapBufferRange, glUnmapBuffer
+                      glMapBufferRange, glUnmapBuffer, glDeleteBuffers, \
+                      glDeleteVertexArrays
 
 # for type hints
 from typing import Optional, Dict
@@ -308,6 +309,25 @@ def fill_buffer(buffer, data, kind) -> None:
     # Orphan the buffer before refilling it
     glBufferData(kind, GLsizeiptr(ctypes.sizeof(gl_array)), None, GL_STATIC_DRAW)
     glBufferData(kind, GLsizeiptr(ctypes.sizeof(gl_array)), gl_array, GL_STATIC_DRAW)
+
+def unload_buffers(vao: GLuint, vbo: GLuint, ebo: GLuint = GLuint(0)) -> None:
+    glBindVertexArray(vao)
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0)
+    glDeleteBuffers(1, vbo)
+    vbo = GLuint(0)
+
+    if ebo.value:
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0)
+        glDeleteBuffers(1, ebo)
+        ebo = GLuint(0)
+
+    glBindVertexArray(0)
+    glDeleteVertexArrays(1, vao)
+    vao = GLuint(0)
+
+    logging.debug("OGL: Successfully deleted VAO %i, VBO %i, EBO %i",
+                  vao, vbo, ebo)
 
 def get_gl_array(pylist):
     if isinstance(pylist[0], int):

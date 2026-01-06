@@ -364,7 +364,10 @@ class PlaterPanel(wx.Panel):
     def delete(self, event):
         i = self.l.GetSelection()
         if i != wx.NOT_FOUND:
+            old_model = self.models[self.l.GetString(i)]
             del self.models[self.l.GetString(i)]
+            old_model.unload()
+            del old_model
             self.l.Delete(i)
             self.l.Select(self.l.GetCount() - 1)
             if self.l.GetCount() < 1:
