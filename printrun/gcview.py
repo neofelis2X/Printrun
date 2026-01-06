@@ -198,6 +198,10 @@ class GCObject:
         self.gcode: Optional[gcoder.GCode] = None
         self.dims = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 
+    def unload(self):
+        if self.model:
+            self.model.unload()
+
 
 class GcodeViewLoader:
 
@@ -229,6 +233,13 @@ class GcodeViewLoader:
         while next(generator) is not None:
             continue
 
+    def unload_old_model(self) -> None:
+        '''Unload the previous model from GPU memory.
+        Make sure to only call this in the main thread.'''
+        if self.obsolete_model:
+            self.obsolete_model.unload()
+            self.obsolete_model = None
+
     def set_gcview_params(self, path_width: float, path_height: float) -> bool:
         return set_gcview_params(self, path_width, path_height)
 
@@ -253,6 +264,7 @@ class GcodeViewMainWrapper(GcodeViewLoader, BaseViz):
         self.p = self  # Hack for backwards compatibility with gviz API
         self.grid = grid
         self.model = None
+        self.obsolete_model = None
         self.objects = [GCObject(None)]
 
         if self.root and hasattr(self.root, "gcview_color_background"):
@@ -302,7 +314,9 @@ class GcodeViewMainWrapper(GcodeViewLoader, BaseViz):
             self.parent.model.num_layers_to_draw = viz_layer
             wx.CallAfter(self.Refresh)
 
-    def clear(self) -> None:
+    def clear(self, *args) -> None:
+        if self.model:
+            self.obsolete_model = self.model
         self.model: Optional[GCodeActor] = None
         self.objects[-1].model = None
         wx.CallAfter(self.Refresh)
@@ -333,6 +347,7 @@ class GcodeViewFrame(GvizBaseFrame, GcodeViewLoader):
                                       grid = grid, circular = circular,
                                       perspective = perspective)
         self.model = objects[0].model if objects else None
+        self.obsolete_model = None
         self.objects = [GCObject(None)]
 
         tool_pos = self.toolbar.GetToolPos(3) + 1
@@ -419,6 +434,8 @@ class GcodeViewFrame(GvizBaseFrame, GcodeViewLoader):
         wx.CallAfter(self.Refresh)
 
     def clear(self) -> None:
+        if self.model:
+            self.obsolete_model = self.model
         self.model: Optional[GCodeActor] = None
         self.objects[-1].model = None
         wx.CallAfter(self.Refresh)

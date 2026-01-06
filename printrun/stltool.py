@@ -160,7 +160,7 @@ class stl:
 
         self.name = ''
         self.filename = ''
-        self.batch = None
+        self.glactor = None
         self.offsets = [0.0, 0.0, 0.0]
         self.rot = 0.0
         self.centeroffset = [0.0, 0.0, 0.0]
@@ -180,7 +180,7 @@ class stl:
                 if not self.parseline(line):
                     return
         else:
-            logging.warning("Not an ascii stl solid - attempting to parse as binary")
+            logging.debug("Not an ascii stl solid - attempting to parse as binary")
             f = open(filename, "rb")
             buf = f.read(84)
             while len(buf) < 84:
@@ -205,6 +205,10 @@ class stl:
                 self.facetsmaxz.append((max(x[2] for x in facet[1]), facet))
             f.close()
             return
+
+    def unload(self):
+        if self.glactor:
+            self.glactor.unload()
 
     def intersect_box(self, ray_near, ray_far):
         ray_near = numpy.array(ray_near)

@@ -49,6 +49,7 @@ except:
     logging.error(_("WX >= 4 is not installed. This program requires WX >= 4 to run."))
     raise
 
+from .gcview import GcodeViewMainWrapper, GcodeViewFrame
 from .gui.widgets import SpecialButton, MacroEditor, PronterOptions, ButtonEdit, get_space
 
 winsize = (800, 500)
@@ -1736,6 +1737,10 @@ Printrun. If not, see <http://www.gnu.org/licenses/>."""
             self.log(message)
             self.statusbar.SetStatusText(message)
             self.savebtn.Enable(True)
+            if isinstance(self.gviz, GcodeViewMainWrapper):
+                self.gviz.unload_old_model()
+            if isinstance(self.gviz, GcodeViewFrame):
+                self.gwindow.unload_old_model()
         self.loadbtn.SetLabel(_("Load File"))
         self.printbtn.SetLabel(_("&Print"))
         self.pausebtn.SetLabel(_("&Pause"))

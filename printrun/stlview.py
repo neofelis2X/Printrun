@@ -77,7 +77,7 @@ class StlViewPanel(wxGLPanel):
         self.gl_cursor.load(self.shader, self.ubo)
         self.cutting_plane.load(self.shader, self.ubo)
         for i in self.parent.models:
-            model = self.parent.models[i].batch
+            model = self.parent.models[i].glactor
             model.load(self.shader, self.ubo)
 
         if hasattr(self.parent, "filenames") and self.parent.filenames:
@@ -128,8 +128,8 @@ class StlViewPanel(wxGLPanel):
     def prepare_model(self, m: stltool.stl, scale: float) -> None:
         self.set_current_context()
         mesh = actors.MeshModel(m)
-        m.batch = mesh
-        m.batch.load(self.shader, self.ubo)
+        m.glactor = mesh
+        m.glactor.load(self.shader, self.ubo)
         self.meshmodels.append(mesh)
         # m.animoffset = 300
         # threading.Thread(target = self.anim, args = (m, )).start()
@@ -149,7 +149,7 @@ class StlViewPanel(wxGLPanel):
 
         # Draw objects
         for i in self.parent.models:
-            model = self.parent.models[i].batch
+            model = self.parent.models[i].glactor
             # FIXME: transformation shouldnt be updated every frame.
             model.update()
             model.draw()
@@ -281,7 +281,7 @@ def main() -> None:
                               -(modeldata.dims[3] + modeldata.dims[2]) / 2,
                               0.0]
     modeldata.scale = [1.0, 1.0, 1.0]
-    modeldata.batch = actors.MeshModel(modeldata)
+    modeldata.glactor = actors.MeshModel(modeldata)
 
     frame.models = {'example': modeldata}
 
