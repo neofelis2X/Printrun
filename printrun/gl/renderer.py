@@ -67,6 +67,7 @@ class MapBufferRange:
 
     def __exit__(self, exc_type, exc_value, exc_traceback) -> bool:
         result = glUnmapBuffer(self.target)
+        glBindVertexArray(0)
         if not result:
             logging.warning("glUnmapBuffer did not return successfully. Please consider reloading the model.")
 

@@ -384,6 +384,7 @@ class Platform(ActorBaseClass):
 
         glBindVertexArray(self.vao)
         glDrawElements(GL_LINES, len(self.indices), GL_UNSIGNED_INT, 0)
+        glBindVertexArray(0)
 
 
 class MouseCursor(ActorBaseClass):
@@ -461,6 +462,7 @@ class MouseCursor(ActorBaseClass):
         glDisable(GL_CULL_FACE)
         glBindVertexArray(self.vao)
         glDrawElements(GL_TRIANGLES, len(self.indices), GL_UNSIGNED_INT, 0)
+        glBindVertexArray(0)
         glEnable(GL_CULL_FACE)
 
 
@@ -520,6 +522,7 @@ class Focus(ActorBaseClass):
         renderer.load_uniform(sid, "u_isDashed", True)
         glBindVertexArray(self.vao)
         glDrawElements(GL_LINES, len(self.indices), GL_UNSIGNED_INT, 0)
+        glBindVertexArray(0)
         renderer.load_uniform(sid, "u_isDashed", False)
         renderer.load_uniform(sid, "u_is2d", False)
 
@@ -631,6 +634,7 @@ class CuttingPlane(ActorBaseClass):
         renderer.load_uniform(self.shaderlist["thicklines"].id,
                               "u_Thickness", 1.5)
         glDrawElements(GL_LINES, 8, GL_UNSIGNED_INT, 6 * sizeof(GLuint))
+        glBindVertexArray(0)
         glEnable(GL_CULL_FACE)
 
 
@@ -692,6 +696,7 @@ class MeshModel(ActorBaseClass):
 
         glBindVertexArray(self.vao)
         glDrawElements(GL_TRIANGLES, len(self.indices), GL_UNSIGNED_INT, 0)
+        glBindVertexArray(0)
 
 
 class Model(ActorBaseClass):
@@ -1271,9 +1276,12 @@ class GcodeModel(Model):
                 self.travels = np.zeros(0, dtype = GLfloat)
                 self.indices = np.zeros(0, dtype = GLuint)
 
+            glBindVertexArray(0)
+
     def draw(self) -> None:
         glBindVertexArray(self.vao)
         renderer.update_ubo_transform(self.ubo, self.modelmatrix)
+
         with self.lock:
             self.shaderlist["basic"].use()
             self._display_movements()
@@ -1281,6 +1289,8 @@ class GcodeModel(Model):
             if self.display_travels:
                 self.shaderlist["lines"].use()
                 self._display_travels()
+
+        glBindVertexArray(0)
 
     def _display_travels(self) -> None:
         sid = self.shaderlist["lines"].id
@@ -1606,6 +1616,8 @@ class GcodeModelLight(Model):
                 self.indices = np.zeros(0, dtype=GLuint)
                 self.travel_indices = np.zeros(0, dtype=GLuint)
 
+            glBindVertexArray(0)
+
     def draw(self) -> None:
         glBindVertexArray(self.vao)
         renderer.update_ubo_transform(self.ubo, self.modelmatrix)
@@ -1616,6 +1628,8 @@ class GcodeModelLight(Model):
             if self.display_travels:
                 self.shaderlist["lines"].use()
                 self._display_travels()
+
+        glBindVertexArray(0)
 
     def _display_travels(self) -> None:
         sid = self.shaderlist["lines"].id
