@@ -229,7 +229,7 @@ class StlViewPanel(wxGLPanel):
                 dist = inter[translate_axis[cutting_axis]]
 
         if dist is not None:
-            dist = min(1.5 * ref_size, max(-0.5 * ref_size, dist))
+            dist = min(1.05 * ref_size, max(-0.05 * ref_size, dist))
 
         return dist
 
