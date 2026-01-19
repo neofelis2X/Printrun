@@ -21,7 +21,7 @@ from pyglet.graphics import shader
 
 from pyglet.gl import GLfloat, GLuint, GLintptr, GLsizeiptr, \
                       GL_ELEMENT_ARRAY_BUFFER, GL_FLOAT, GL_ARRAY_BUFFER, \
-                      GL_STATIC_DRAW, GL_FALSE, GL_TRUE, GL_UNIFORM_BUFFER, \
+                      GL_STATIC_DRAW, GL_FALSE, GL_UNIFORM_BUFFER, \
                       GL_DYNAMIC_DRAW, GL_MAP_WRITE_BIT, GL_MAP_READ_BIT, \
                       glGenVertexArrays, glBindVertexArray, glGenBuffers, \
                       glBindBuffer, glBufferData, glEnableVertexAttribArray, \
@@ -58,7 +58,7 @@ class MapBufferRange:
                                       self.access)
 
         if not buffer_ptr:
-            logging.error("glMapBuffer failed")
+            logging.error("GL: glMapBuffer failed")
             return None
 
         float_ptr = ctypes.cast(buffer_ptr, ctypes.POINTER(self.elementtype))
@@ -69,10 +69,10 @@ class MapBufferRange:
         result = glUnmapBuffer(self.target)
         glBindVertexArray(0)
         if not result:
-            logging.warning("glUnmapBuffer did not return successfully. Please consider reloading the model.")
+            logging.warning("GL: glUnmapBuffer did not return successfully. Please consider reloading the model.")
 
         if exc_type:
-            logging.exception("Error in MapBufferRange",
+            logging.exception("GL: Error in MapBufferRange",
                               exc_info=(exc_type, exc_value, exc_traceback))
             return True
 
@@ -81,14 +81,14 @@ class MapBufferRange:
 
 def load_shader() -> Optional[Dict[str, shader.ShaderProgram]]:
     if not SRC_SHADER_DIR.is_dir():
-        logging.error("Directory containing the \
+        logging.error("GL: Directory containing the \
         shader is not accessible.\nPath: %s" % SRC_SHADER_DIR.resolve())
         return None
 
     srcs = SRC_SHADER_DIR.glob("*.glsl")
-    shader_kinds = {".vert": "vertex",
-                    ".frag": "fragment",
-                    ".geom": "geometry"}
+    shader_kinds: dict[str, shader.ShaderType] = {".vert": "vertex",
+                                                  ".frag": "fragment",
+                                                  ".geom": "geometry"}
     shs = {}
     for src in srcs:
         kind = shader_kinds[src.suffixes[0]]
@@ -101,26 +101,26 @@ def load_shader() -> Optional[Dict[str, shader.ShaderProgram]]:
         basic_program = shader.ShaderProgram(shs["basic.vert"],
                                              shs["basic.frag"])
     except shader.ShaderException as e:
-        logging.error("Error creating the 'basic' shader program: %s" % e)
+        logging.error("GL: Error creating the 'basic' shader program: %s" % e)
         return None
-    logging.debug("Successfully created the 'basic' shader program.")
+    logging.debug("GL: Successfully created the 'basic' shader program.")
 
     try:
         lines_program = shader.ShaderProgram(shs["lines.vert"],
                                              shs["lines.frag"])
     except shader.ShaderException as e:
-        logging.error("Error creating the 'lines' shader program:%s" % e)
+        logging.error("GL: Error creating the 'lines' shader program:%s" % e)
         return None
-    logging.debug("Successfully created the 'lines' shader program.")
+    logging.debug("GL: Successfully created the 'lines' shader program.")
 
     try:
         thick_program = shader.ShaderProgram(shs["lines.vert"],
                                              shs["thicklines.geom"],
                                              shs["thicklines.frag"])
     except shader.ShaderException as e:
-        logging.error("Error creating the 'thicklines' shader program:%s" % e)
+        logging.error("GL: Error creating the 'thicklines' shader program:%s" % e)
         return None
-    logging.debug("Successfully created the 'thicklines' shader program.")
+    logging.debug("GL: Successfully created the 'thicklines' shader program.")
 
     for sh in shs.values():
         sh.delete()
@@ -129,15 +129,15 @@ def load_shader() -> Optional[Dict[str, shader.ShaderProgram]]:
             "lines": lines_program,
             "thicklines": thick_program}
 
-def _compile_shader(src: Path, kind: str) -> Optional[shader.Shader]:
+def _compile_shader(src: Path, kind: shader.ShaderType) -> Optional[shader.Shader]:
     if not src.is_file():
-        logging.error("Source file for %s shader is not available." % src.name)
+        logging.error("GL: Source file for %s shader is not available." % src.name)
         return None
 
     try:
         new_shader = shader.Shader(src.read_text(encoding="utf-8"), kind)
     except shader.ShaderException as e:
-        logging.error("Error in %s shader:%s" % (kind, e))
+        logging.error("GL: Error in %s shader:%s" % (kind, e))
         return None
 
     return new_shader
@@ -145,7 +145,7 @@ def _compile_shader(src: Path, kind: str) -> Optional[shader.Shader]:
 def load_uniform(shader_id, uniform_name: str, data):
     location = glGetUniformLocation(shader_id, uniform_name.encode())
     if location == -1:
-        logging.warning("Could not find Uniform location: %s" % uniform_name)
+        logging.warning("GL: Could not find Uniform location: %s" % uniform_name)
         return
 
     if isinstance(data, bool):
@@ -168,7 +168,7 @@ def get_normal_mat(model_mat: np.ndarray) -> np.ndarray:
     try:
         inv_mat = np.linalg.inv(sub)
     except np.linalg.LinAlgError as e:
-        logging.warning("Error inverting normal matrix: %s" % e)
+        logging.warning("GL: Error inverting normal matrix: %s" % e)
         return sub
     return inv_mat.T
 
@@ -205,10 +205,10 @@ def create_ubo():
     bytesize = ctypes.sizeof(GLfloat)
     glGenBuffers(1, ubo)
     glBindBuffer(GL_UNIFORM_BUFFER, ubo)
-    glBufferData(GL_UNIFORM_BUFFER, 256 * bytesize, None, GL_DYNAMIC_DRAW)
+    glBufferData(GL_UNIFORM_BUFFER, GLsizeiptr(256 * bytesize), None, GL_DYNAMIC_DRAW)
     glBindBuffer(GL_UNIFORM_BUFFER, 0)
 
-    glBindBufferRange(GL_UNIFORM_BUFFER, 0, ubo, 0, 256 * bytesize)
+    glBindBufferRange(GL_UNIFORM_BUFFER, 0, ubo, GLintptr(0), GLsizeiptr(256 * bytesize))
     #glBindBufferRange(GL_UNIFORM_BUFFER, 1, ubo, 64 * bytesize, 8 * bytesize)
 
     return ubo
@@ -229,7 +229,7 @@ def update_ubo_view(ubo, camera):
     offset = 0
     eye = camera.eye
     eye_offset = offset + 2 * data.nbytes
-    glBufferSubData(GL_UNIFORM_BUFFER, offset, data.nbytes, data.ctypes.data)
+    glBufferSubData(GL_UNIFORM_BUFFER, GLintptr(offset), data.nbytes, data.ctypes.data)
     glBufferSubData(GL_UNIFORM_BUFFER, eye_offset, eye.nbytes,
                     eye.ctypes.data)
 
@@ -244,7 +244,7 @@ def update_ubo_viewport(ubo, camera, viewport):
     vp = np.array(viewport, dtype=np.float32)
     vp_offset = offset + (16 + 4) * bytesize
     glBufferSubData(GL_UNIFORM_BUFFER, offset, mat.nbytes, mat.ctypes.data)
-    glBufferSubData(GL_UNIFORM_BUFFER, vp_offset, vp.nbytes, vp.ctypes.data)
+    glBufferSubData(GL_UNIFORM_BUFFER, vp_offset, GLintptr(vp.nbytes), vp.ctypes.data)
 
     glBindBuffer(GL_UNIFORM_BUFFER, 0)
 
@@ -259,7 +259,7 @@ def update_ubo_transform(ubo, transform_mat):
     nm_padded = np.pad(nm.T, ((0, 0), (0, 1)), mode="constant")
 
     data = np.concatenate((tm, nm_padded))
-    glBufferSubData(GL_UNIFORM_BUFFER, offset, data.nbytes, data.ctypes.data)
+    glBufferSubData(GL_UNIFORM_BUFFER, GLintptr(offset), GLsizeiptr(data.nbytes), data.ctypes.data)
 
     glBindBuffer(GL_UNIFORM_BUFFER, 0)
 
@@ -327,7 +327,7 @@ def unload_buffers(vao: GLuint, vbo: GLuint, ebo: GLuint = GLuint(0)) -> None:
     glDeleteVertexArrays(1, vao)
     vao = GLuint(0)
 
-    logging.debug("OGL: Successfully deleted VAO %i, VBO %i, EBO %i",
+    logging.debug("GL: Successfully deleted VAO %i, VBO %i, EBO %i",
                   vao, vbo, ebo)
 
 def get_gl_array(pylist):

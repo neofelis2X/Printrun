@@ -14,6 +14,7 @@
 # along with Printrun.  If not, see <http://www.gnu.org/licenses/>.
 
 import math
+import logging
 import numpy as np
 from pyglet import gl
 
@@ -248,14 +249,15 @@ def np_unproject(winx: float, winy: float, winz: float,
         viewport: Viewport as a ctypes array [x, y, width, height].
 
     Returns:
-        bool: True if successful, False otherwise.
+        bool: Vector if successful, 0.0 otherwise.
     '''
     mat_a = p_mat @ mv_mat
 
     try:
         mat_inv = np.linalg.inv(mat_a)
     except np.linalg.LinAlgError:
-        return False
+        logging.warning(_("GL: np_unproject could calculate inverse of matrix, result will be 0.0."))
+        return (0.0, 0.0, 0.0)
 
     # Normalized screen coordinates between -1 and 1
     coords_in = np.zeros(4)
@@ -267,8 +269,8 @@ def np_unproject(winx: float, winy: float, winz: float,
     # Object coordinates
     coords_out = mat_inv @ coords_in
     if coords_out[3] == 0.0:
-        return False
-    # TODO: Fix return schema.
+        logging.warning(_("GL: np_unproject failed, division by 0 is not allowed. Result will be 0.0."))
+        return (0.0, 0.0, 0.0)
 
     coords_out[3] = 1.0 / coords_out[3]
     pointx = coords_out[0] * coords_out[3]

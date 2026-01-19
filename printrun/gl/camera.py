@@ -187,7 +187,7 @@ class Camera():
             half_min_fov_rad = np.atan(aspect * np.tan(half_min_fov_rad))
 
         distance_to_center = bounding_sphere[1] / np.sin(half_min_fov_rad)
-        self._target = bounding_sphere[0]
+        self._target = np.array(bounding_sphere[0])
         self._eye = self._target - uforward * distance_to_center
 
         if self.is_orthographic:
@@ -296,10 +296,10 @@ class Camera():
 
     def handle_rotation(self, event: MouseEvent) -> None:
         if self.init_rot_pos is None:
-            self.init_rot_pos = event.GetPosition() * self.display_ppi_factor
+            self.init_rot_pos = [self.display_ppi_factor * val for val in event.GetPosition()]
         else:
             p1 = self.init_rot_pos
-            p2 = event.GetPosition() * self.display_ppi_factor
+            p2 = [self.display_ppi_factor * val for val in event.GetPosition()]
 
             p1x = p1[0] / (self.width / 2) - 1
             p1y = 1 - p1[1] / (self.height / 2)
@@ -323,10 +323,10 @@ class Camera():
 
     def handle_translation(self, event: MouseEvent) -> None:
         if self.init_trans_pos is None:
-            self.init_trans_pos = event.GetPosition() * self.display_ppi_factor
+            self.init_trans_pos = [self.display_ppi_factor * val for val in event.GetPosition()]
         else:
             p1 = self.init_trans_pos
-            p2 = event.GetPosition() * self.display_ppi_factor
+            p2 = [self.display_ppi_factor * val for val in event.GetPosition()]
 
             vec1 = np.array(self.canvas.mouse_to_3d(p1[0], p1[1]))
             vec2 = np.array(self.canvas.mouse_to_3d(p2[0], p2[1]))
