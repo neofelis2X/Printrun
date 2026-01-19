@@ -44,15 +44,13 @@ from printrun.utils import install_locale
 install_locale("pronterface")
 
 # for type hints
-from typing import TYPE_CHECKING, Any, Tuple, Union, Callable
+from typing import Any, Tuple, Union
 from printrun import stltool
 from printrun import gcoder
 Build_Dims = Tuple[int, int, int, int, int, int]
 Gcode_Dims = Tuple[Tuple[float , float, float],
                    Tuple[float , float, float],
                    Tuple[float , float, float]]
-if TYPE_CHECKING:
-    from printrun.gcview import GCObject
 
 def gcode_dims(g: gcoder.GCode) -> Gcode_Dims:
     return ((g.xmin, g.xmax, g.width),
@@ -131,7 +129,7 @@ class wxGLPanel(BASE_CLASS):
         # initialised with pyglet during glinit
         self.pygletcontext = None
 
-        self.mousepos = (0, 0)
+        self.mousepos = [0.0, 0.0]
         self.parent = parent
         self.build_dimensions = build_dimensions
 
@@ -264,7 +262,7 @@ class wxGLPanel(BASE_CLASS):
         self.ubo = renderer.create_ubo()
         shader = renderer.load_shader()
         if not shader:
-            logging.error("Error happened loading the OpenGL shader.")
+            logging.error("GL: Loading OpenGL shader failed.")
             self.gl_broken = True
             return
 
@@ -281,7 +279,7 @@ class wxGLPanel(BASE_CLASS):
         self.set_current_context()
         old_width, old_height = self.width, self.height
 
-        self.display_ppi_factor = self.GetContentScaleFactor()
+        self.display_ppi_factor = float(self.GetContentScaleFactor())
         new_size = self.GetClientSize() * self.display_ppi_factor
         width, height = new_size.width, new_size.height
 
@@ -343,7 +341,7 @@ class wxGLPanel(BASE_CLASS):
         for old in old_shader.values():
             old.delete()
 
-        logging.info("OpenGL shader has been reloaded.")
+        logging.info("GL: OpenGL shader has been reloaded.")
         wx.CallAfter(self.Refresh)
 
     def recreate_platform(self, build_dimensions: Build_Dims,
@@ -464,7 +462,7 @@ class wxGLPanel(BASE_CLASS):
             return
 
         self.set_current_context()
-        self.mousepos = event.GetPosition() * self.display_ppi_factor
+        self.mousepos = [self.display_ppi_factor * val for val in event.GetPosition()]
 
         if event.Dragging():
             if event.LeftIsDown():
@@ -491,7 +489,7 @@ class wxGLPanel(BASE_CLASS):
 
     def handle_wheel(self, event: wx.MouseEvent) -> None:
         '''This runs when Mousewheel is used'''
-        x, y = event.GetPosition() * self.display_ppi_factor
+        x, y = [self.display_ppi_factor * val for val in event.GetPosition()]
         factor = 1.02 if event.GetModifiers() == wx.MOD_CONTROL else 1.05
 
         if event.GetWheelRotation() > 0:
