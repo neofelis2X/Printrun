@@ -180,8 +180,8 @@ class PlaterPanel(wx.Panel):
                     else:
                         orig_handler(event)
             patch_method(viewer.camera, "handle_rotation", handle_rotation)
-            viewer.focus.update_colour(self.gl_bg_colour)
-            viewer.platform.update_colour(self.gl_bg_colour)
+            viewer.focus.update_color(self.gl_bg_colour)
+            viewer.platform.update_color(self.gl_bg_colour)
 
         # Patch handle_wheel on the fly
         if hasattr(viewer, "handle_wheel_shift"):

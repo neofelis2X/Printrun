@@ -268,9 +268,8 @@ class GcodeViewMainWrapper(GcodeViewLoader, BaseViz):
         self.objects = [GCObject(None)]
 
         if self.root and hasattr(self.root, "gcview_color_background"):
-            colour = self.root.gcview_color_background
-            self.glpanel.color_background = colour
-            self.update_actor_colours(colour)
+            color = self.root.gcview_color_background
+            self.glpanel.update_background_color(color)
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self.glpanel, name)
@@ -285,7 +284,7 @@ class GcodeViewMainWrapper(GcodeViewLoader, BaseViz):
                         self.root.gwindow.IsShown():
 
                         setattr(self.root.gwindow.model, s.name[7:],
-                                getattr(self.model, s.name[7:]))
+                                getattr(self.model, s.name[7:], None))
                         self.root.gwindow.glpanel.set_current_context()
                         self.root.gwindow.model.update_colors(color_name = s.name)
                         self.root.gwindow.glpanel.Refresh()
@@ -297,15 +296,9 @@ class GcodeViewMainWrapper(GcodeViewLoader, BaseViz):
             if not self.refresh_timer.IsRunning():
                 self.refresh_timer.Start()
 
-    def update_actor_colours(self, colour: Tuple[float, float, float]) -> None:
-        self.glpanel.set_current_context()
-        self.glpanel.focus.update_colour(colour)
-        self.glpanel.platform.update_colour(colour)
-
     def recreate_platform(self, build_dimensions: Build_Dims,
                           circular: bool, grid: Tuple[int, int]) -> None:
-        colour = self.root.gcview_color_background
-        return self.glpanel.recreate_platform(build_dimensions, circular, grid, colour)
+        self.glpanel.update_platform(build_dimensions, circular, grid)
 
     def setlayer(self, layer: int) -> None:
         assert self.model is not None
@@ -356,9 +349,8 @@ class GcodeViewFrame(GvizBaseFrame, GcodeViewLoader):
         self.toolbar.Realize()
 
         if self.root and hasattr(self.root, "gcview_color_background"):
-            colour = self.root.gcview_color_background
-            self.glpanel.color_background = colour
-            self.update_actor_colours(colour)
+            color = self.root.gcview_color_background
+            self.glpanel.update_background_color(color)
 
         h_sizer.Add(self.glpanel, 1, wx.EXPAND)
         h_sizer.Add(self.layerslider, 0, wx.EXPAND | wx.ALL, get_space('minor'))
@@ -412,14 +404,9 @@ class GcodeViewFrame(GvizBaseFrame, GcodeViewLoader):
             if not self.refresh_timer.IsRunning():
                 self.refresh_timer.Start()
 
-    def update_actor_colours(self, colour: Tuple[float, float, float]) -> None:
-        self.glpanel.focus.update_colour(colour)
-        self.glpanel.platform.update_colour(colour)
-
     def recreate_platform(self, build_dimensions: Build_Dims,
                           circular: bool, grid: Tuple[int, int]) -> None:
-        colour = self.root.gcview_color_background
-        self.glpanel.recreate_platform(build_dimensions, circular, grid, colour)
+        self.glpanel.update_platform(build_dimensions, circular, grid)
 
     def addfile(self, gcode: Optional[gcoder.GCode] = None, light_model=False) -> None:
         if self.clonefrom:

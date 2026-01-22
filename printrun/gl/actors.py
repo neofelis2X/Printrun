@@ -137,12 +137,12 @@ class Platform(ActorBaseClass):
     COLOR_DARK = (64 / 255, 64 / 255, 64 / 255)
 
     def __init__(self, build_dimensions: Build_Dims,
-                 light: bool = False,
-                 circular: bool = False,
+                 is_light: bool = False,
+                 is_circular: bool = False,
                  grid: Tuple[int, int] = (1, 10)) -> None:
         super().__init__()
-        self.light = light
-        self.is_circular = circular
+        self.lightweight_viz = is_light
+        self.is_circular = is_circular
         self.width = build_dimensions[0]
         self.depth = build_dimensions[1]
         self.height = build_dimensions[2]
@@ -154,29 +154,37 @@ class Platform(ActorBaseClass):
         self.color_minor = (*self.COLOR_DARK, 0.1)
         self.color_interm = (*self.COLOR_DARK, 0.2)
         self.color_major = (*self.COLOR_DARK, 0.33)
+        self.is_dark = True
 
         self.vertices = ()
         self.indices = []
         self.color = ()
         self._initialise_data()
 
-        self.loaded = True
+        self.loaded = False
 
     @property
     def modelmatrix(self):
         return self._modelmatrix
 
-    def update_colour(self, bg_color: Tuple[float, float, float]) -> None:
+    def update_color(self, bg_color: Tuple[float, float, float, float]) -> None:
         '''Update the color of the platform grid based on the
         luminance (brightness) of the background.'''
-        if high_luminance(bg_color):
+        if high_luminance(bg_color[:3]):
             base_color = self.COLOR_DARK  # Dark lines
+            is_dark = True
         else:
             base_color = self.COLOR_LIGHT  # Bright lines
+            is_dark = False
+
+        if self.is_dark == is_dark:
+            # No need to change the color.
+            return
 
         self.color_minor = (*base_color, 0.1)
         self.color_interm = (*base_color, 0.2)
         self.color_major = (*base_color, 0.33)
+        self.is_dark = is_dark
 
         # This blends the grid colors with the background color into a
         # solid color without alpha. Current solution bares better results.
@@ -185,13 +193,28 @@ class Platform(ActorBaseClass):
         # self.color_major = blend_colors(bg_color, base_color, 0.33)
 
         self._initialise_data()
+        self.loaded = False
+
+    def update_gridsize(self, build_dimensions: Build_Dims,
+                        is_circular: bool, grid: Tuple[int, int]):
+        self.width = build_dimensions[0]
+        self.depth = build_dimensions[1]
+        self.height = build_dimensions[2]
+        self.xoffset = build_dimensions[3]
+        self.yoffset = build_dimensions[4]
+        self.zoffset = build_dimensions[5]
+        self.is_circular = is_circular
+        self.grid = grid
+
+        self._initialise_data()
+        self.loaded = False
 
     def _color(self, i: float) -> Tuple:
         if i % self.grid[1] == 0:
             return self.color_major
         if i % (self.grid[1] // 2) == 0:
             return self.color_interm
-        if self.light:
+        if self.lightweight_viz:
             return ()
         return self.color_minor
 
@@ -200,21 +223,26 @@ class Platform(ActorBaseClass):
                                              self.yoffset,
                                              self.zoffset)
         if self.is_circular:
-            self._load_circular()
+            self._preload_circular()
         else:
-            self._load_rectangular()
-
-    def _update_vbo(self):
-        vb = renderer.interleave_vertex_data(self.vertices, self.color,
-                                             distinct_colors=True)
-        renderer.fill_buffer(self.vbo, vb, GL_ARRAY_BUFFER)
+            self._preload_rectangular()
 
     def load(self, shader, ubo) -> None:
         self.shaderlist = shader
         self.ubo = ubo
         self.vao, self.vbo, self.ebo = renderer.create_buffers(lines_only=True)
+
+        self._load()
+
+    def _load(self) -> None: 
+        glBindVertexArray(self.vao)
         renderer.fill_buffer(self.ebo, self.indices, GL_ELEMENT_ARRAY_BUFFER)
-        self._update_vbo()
+
+        vb = renderer.interleave_vertex_data(self.vertices, self.color,
+                                             distinct_colors=True)
+        renderer.fill_buffer(self.vbo, vb, GL_ARRAY_BUFFER)
+        glBindVertexArray(0)
+        self.loaded = True
 
     def _origin_arrows(self) -> Tuple[float, float, float]:
         arrow_offset = self.width * 0.01
@@ -223,7 +251,7 @@ class Platform(ActorBaseClass):
 
         return (arrow_offset, arrow_side_length, arrow_height)
 
-    def _load_grid(self, z_val):
+    def _preload_grid(self, z_val):
         vertices = []
         colors = []
         indices = []
@@ -308,13 +336,13 @@ class Platform(ActorBaseClass):
 
         return (vertices, indices, colors)
 
-    def _load_circular(self):
+    def _preload_circular(self):
         x_half = self.width / 2
         y_half = self.depth / 2
         z_height = -0.01
 
         # Grid
-        vertices, indices, colors = self._load_grid(z_height)
+        vertices, indices, colors = self._preload_grid(z_height)
 
         # Circle outline
         for deg in range(0, 361):
@@ -339,10 +367,10 @@ class Platform(ActorBaseClass):
         self.indices = indices
         self.color = colors
 
-    def _load_rectangular(self):
+    def _preload_rectangular(self):
         z_height = -0.01
         # Grid
-        vertices, indices, colors = self._load_grid(z_height)
+        vertices, indices, colors = self._preload_grid(z_height)
 
         # Arrows at origin point
         ao, al, ah = self._origin_arrows()
@@ -379,6 +407,9 @@ class Platform(ActorBaseClass):
         self.color = colors
 
     def draw(self) -> None:
+        if not self.loaded:
+            self._load()
+
         renderer.update_ubo_transform(self.ubo, self.modelmatrix)
         self.shaderlist["lines"].use()
 
@@ -480,44 +511,64 @@ class Focus(ActorBaseClass):
         self.vertices = ()
         self.indices = []
         self.color = (15 / 255, 15 / 255, 15 / 255, 0.6)  # Black Transparent
-        self.is_initialised = False
+        self.loaded = False
+        self.is_dark = True
+
+        self.update_size()
 
     def load(self, shader, ubo) -> None:
         self.shaderlist = shader
         self.ubo = ubo
         self.vao, self.vbo, self.ebo = renderer.create_buffers(lines_only=True)
 
-        self.is_initialised = True
-        self.update_size()
         self.indices = [1, 0, 1, 2, 2, 3, 0, 3]
         renderer.fill_buffer(self.ebo, self.indices, GL_ELEMENT_ARRAY_BUFFER)
 
-    def update_size(self) -> None:
-        if not self.is_initialised:
-            return
+        self._load()
 
+    def _load(self) -> None:
+        glBindVertexArray(self.vao)
+
+        vs = renderer.interleave_vertex_data(self.vertices, self.color)
+        renderer.fill_buffer(self.vbo, vs, GL_ARRAY_BUFFER)
+
+        glBindVertexArray(0)
+        self.loaded = True
+
+    def update_size(self) -> None:
         # Starts at the lower left corner, x, y
         offset = 1.0 * self.camera.display_ppi_factor
         self.vertices = ((offset, offset, 0.0),
                          (self.camera.width - offset, offset, 0.0),
                          (self.camera.width - offset, self.camera.height - offset, 0.0),
                          (offset, self.camera.height - offset, 0.0))
-        vs = renderer.interleave_vertex_data(self.vertices, self.color)
-        renderer.fill_buffer(self.vbo, vs, GL_ARRAY_BUFFER)
 
-    def update_colour(self, bg_color: Tuple[float, float, float]) -> None:
+        self.loaded = False
+
+    def update_color(self, bg_color: Tuple[float, float, float, float]) -> None:
         '''Update the color of the focus based on the
         luminance (brightness) of the background.'''
-        if high_luminance(bg_color):
+        if high_luminance(bg_color[:3]):
             self.color = (*self.COLOR_DARK, 0.6)  # Dark Transparent
+            is_dark = True
         else:
             self.color = (*self.COLOR_LIGHT, 0.4)  # Light Transparent
-        self.update_size()
+            is_dark = False
+
+        if self.is_dark == is_dark:
+            return
+
+        self.is_dark = is_dark
+        self.loaded = False
 
     def draw(self) -> None:
+        if not self.loaded:
+            self._load()
+
         renderer.update_ubo_transform(self.ubo, self.modelmatrix)
         self.shaderlist["lines"].use()
         sid = self.shaderlist["lines"].id
+
         renderer.load_uniform(sid, "u_is2d", True)
         renderer.load_uniform(sid, "u_isDashed", True)
         glBindVertexArray(self.vao)
