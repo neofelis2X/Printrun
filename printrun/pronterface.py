@@ -1226,10 +1226,10 @@ Printrun. If not, see <http://www.gnu.org/licenses/>."""
         # In case we change the background colour we need
         # to update the colours of the grid and focus
         if param == 'gcview_color_background':
-            if hasattr(self, 'gviz') and hasattr(self.gviz, 'update_actor_colours'):
-                self.gviz.update_actor_colours(color)
-            if hasattr(self, 'gwindow') and hasattr(self.gwindow, 'update_actor_colours'):
-                self.gwindow.update_actor_colours(color)
+            if hasattr(self, 'gviz') and hasattr(self.gviz, 'glpanel'):
+                self.gviz.glpanel.update_background_color(color)
+            if hasattr(self, 'gwindow') and hasattr(self.gwindow, 'glpanel'):
+                self.gwindow.glpanel.update_background_color(color)
         wx.CallAfter(self.Refresh)
 
     def update_build_dimensions(self, param, value):

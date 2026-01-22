@@ -114,7 +114,7 @@ class wxGLPanel(BASE_CLASS):
         self.camera = camera.Camera(self, build_dimensions,
                                     ortho = not perspective)
         self.focus = actors.Focus(self.camera)
-        self.platform = actors.Platform(build_dimensions, circular = circular,
+        self.platform = actors.Platform(build_dimensions, is_circular = circular,
                                         grid = grid)
         self.keyinput = kbi.KeyboardInput(self.canvas, self.zoom_to_center,
                                           self.fit, self.resetview,
@@ -344,17 +344,6 @@ class wxGLPanel(BASE_CLASS):
         logging.info("GL: OpenGL shader has been reloaded.")
         wx.CallAfter(self.Refresh)
 
-    def recreate_platform(self, build_dimensions: Build_Dims,
-                          circular: bool, grid: Tuple[int, int],
-                          colour: Tuple[float, float, float]) -> None:
-
-        self.platform = actors.Platform(build_dimensions,
-                                 circular = circular,
-                                 grid = grid)
-        self.platform.update_colour(colour)
-        self.camera.update_build_dims(build_dimensions)
-        wx.CallAfter(self.Refresh)
-
     def DrawCanvas(self) -> None:
         """Draw the window."""
         self.set_current_context()
@@ -366,8 +355,6 @@ class wxGLPanel(BASE_CLASS):
 
         glClearColor(*self.color_background)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-
-
 
         if self.canvas.HasFocus():
             self.focus.draw()
@@ -395,6 +382,20 @@ class wxGLPanel(BASE_CLASS):
     # ==========================================================================
     # Mouse and Utilities
     # ==========================================================================
+    def update_platform(self, build_dimensions: Build_Dims,
+                          is_circular: bool, grid: Tuple[int, int]) -> None:
+        self.set_current_context()
+        self.platform.update_gridsize(build_dimensions, is_circular, grid)
+        self.camera.update_build_dims(build_dimensions)
+        wx.CallAfter(self.Refresh)
+
+    def update_background_color(self, color: Tuple[float, float, float, float]
+                                ) -> None:
+        self.color_background = color
+        self.set_current_context()
+        self.focus.update_color(color)
+        self.platform.update_color(color)
+
     def mouse_to_3d(self, x: float, y: float, z = 1.0
                     ) -> Tuple[float, float, float]:
         x = float(x)
