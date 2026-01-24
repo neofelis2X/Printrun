@@ -383,7 +383,7 @@ class wxGLPanel(BASE_CLASS):
     # Mouse and Utilities
     # ==========================================================================
     def update_platform(self, build_dimensions: Build_Dims,
-                          is_circular: bool, grid: Tuple[int, int]) -> None:
+                        is_circular: bool, grid: Tuple[int, int]) -> None:
         self.set_current_context()
         self.platform.update_gridsize(build_dimensions, is_circular, grid)
         self.camera.update_build_dims(build_dimensions)
@@ -396,23 +396,10 @@ class wxGLPanel(BASE_CLASS):
         self.focus.update_color(color)
         self.platform.update_color(color)
 
-    def mouse_to_3d(self, x: float, y: float, z = 1.0
-                    ) -> Tuple[float, float, float]:
-        x = float(x)
-        y = self.height - float(y)
-
-        mvmat = self.camera.view
-        pmat = self.camera.projection
-        viewport = (0.0, 0.0, self.width, self.height)
-
-        px, py, pz = np_unproject(x, y, z, mvmat, pmat, viewport)
-        return px, py, pz
-
-    def mouse_to_ray(self, x: float, y: float,
-                     ) -> Tuple[Tuple[float, float, float], Tuple[float, float, float]]:
+    def mouse_to_ray(self, x: float, y: float
+                     ) -> Tuple[np.ndarray, np.ndarray]:
         # Ray from z-depth 1.0 to 0.0
-        x = float(x)
-        y = self.height - float(y)
+        y = self.height - y
         mvmat = self.camera.view
         pmat = self.camera.projection
         viewport = (0.0, 0.0, self.width, self.height)
@@ -427,8 +414,6 @@ class wxGLPanel(BASE_CLASS):
                        ) -> Union[Tuple[float, float, float], None]:
         # Ray/plane intersection
         ray_near, ray_far = self.mouse_to_ray(x, y)
-        ray_near = np.array(ray_near)
-        ray_far = np.array(ray_far)
         ray_dir = ray_far - ray_near
         ray_dir = ray_dir / np.linalg.norm(ray_dir)
         plane_normal_np = np.array(plane_normal)

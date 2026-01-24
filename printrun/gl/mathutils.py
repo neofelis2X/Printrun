@@ -19,8 +19,10 @@ import numpy as np
 from pyglet import gl
 
 # for type hints
-from typing import List, Tuple
+from typing import List, Tuple, TYPE_CHECKING
 from ctypes import Array
+if TYPE_CHECKING:
+    from .camera import Camera
 
 def vec(*args: float) -> Array:
     '''Returns an array of GLfloat values'''
@@ -102,6 +104,18 @@ def mulquat(q1: Tuple[float, float, float, float],
             q1[3] * rq[1] + q1[1] * rq[3] + q1[2] * rq[0] - q1[0] * rq[2],
             q1[3] * rq[2] + q1[2] * rq[3] + q1[0] * rq[1] - q1[1] * rq[0],
             q1[3] * rq[3] - q1[0] * rq[0] - q1[1] * rq[1] - q1[2] * rq[2])
+
+def mouse_to_3d(x: float, y: float, z: float, camera: 'Camera',
+                canvas_size: Tuple[float, float]) -> np.ndarray:
+    point = np.zeros(3)
+    y = canvas_size[1] - y
+
+    mvmat = camera.view
+    pmat = camera.projection
+    viewport = (0.0, 0.0, canvas_size[0], canvas_size[1])
+
+    point = np.array(np_unproject(x, y, z, mvmat, pmat, viewport))
+    return point
 
 def quat_rotate_vec(quat: Tuple[float, float, float, float],
                      vector_list: List[np.ndarray]) -> List[np.ndarray]:
@@ -236,7 +250,7 @@ def np_to_gl_mat(np_matrix: np.ndarray) -> Array:
 def np_unproject(winx: float, winy: float, winz: float,
                  mv_mat: np.ndarray, p_mat: np.ndarray,
                  viewport: Tuple[float, float, float, float]
-                 ) -> Tuple[float, float, float]:
+                 ) -> np.ndarray:
     '''
     gluUnProject in Python with numpy. This is a direct
     implementation of the Khronos OpenGL Wiki code:
@@ -251,13 +265,14 @@ def np_unproject(winx: float, winy: float, winz: float,
     Returns:
         bool: Vector if successful, 0.0 otherwise.
     '''
+    point = np.zeros(3)
     mat_a = p_mat @ mv_mat
 
     try:
         mat_inv = np.linalg.inv(mat_a)
     except np.linalg.LinAlgError:
         logging.warning(_("GL: np_unproject could calculate inverse of matrix, result will be 0.0."))
-        return (0.0, 0.0, 0.0)
+        return point
 
     # Normalized screen coordinates between -1 and 1
     coords_in = np.zeros(4)
@@ -270,12 +285,12 @@ def np_unproject(winx: float, winy: float, winz: float,
     coords_out = mat_inv @ coords_in
     if coords_out[3] == 0.0:
         logging.warning(_("GL: np_unproject failed, division by 0 is not allowed. Result will be 0.0."))
-        return (0.0, 0.0, 0.0)
+        return point
 
     coords_out[3] = 1.0 / coords_out[3]
-    pointx = coords_out[0] * coords_out[3]
-    pointy = coords_out[1] * coords_out[3]
-    pointz = coords_out[2] * coords_out[3]
+    point[0] = coords_out[0] * coords_out[3]
+    point[1] = coords_out[1] * coords_out[3]
+    point[2] = coords_out[2] * coords_out[3]
 
-    return pointx, pointy, pointz
+    return point
 
