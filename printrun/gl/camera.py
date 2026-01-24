@@ -19,7 +19,7 @@ import numpy as np
 
 from .mathutils import vec_length, mulquat, trackball, mouse_to_3d, \
                        mat4_orthographic, mat4_perspective, axis_to_quat, \
-                       quat_rotate_vec
+                       quat_rotate_vec, mouse_to_plane
 
 # for type hints
 from typing import Optional, Tuple, TYPE_CHECKING
@@ -27,6 +27,19 @@ from wx import MouseEvent
 Build_Dims = Tuple[int, int, int, int, int, int]
 if TYPE_CHECKING:
     from .panel import wxGLPanel
+
+
+def debug_info(method):
+    def wrapper(self, *args, **kwargs):
+        #print("Before method execution")
+        output = method(self, *args, **kwargs)
+        v = self._target
+        print(f"Target: \t({v[0]:.3f}, {v[1]:.3f}, {v[2]:.3f})")
+        v = self._eye
+        print(f"Eye: \t({v[0]:.3f}, {v[1]:.3f}, {v[2]:.3f})")
+        print("")
+        return output
+    return wrapper
 
 
 class Camera():
@@ -49,9 +62,10 @@ class Camera():
         self.height = 1.0
         self.display_ppi_factor = 1.0
 
-        self.platformcenter = (0.0, 0.0)
-        self.platform = (1.0, 1.0)
+        self.platformcenter = np.array((0.0, 0.0, 0.0))
+        self.platform = (1.0, 1.0, 1.0)
         self.dist = 1.0
+        self.scene_bounds = np.zeros((2, 3))
         self.update_build_dims(build_dimensions, setview=False)
 
         self._eye = np.array((0.0, 0.0, 1.0))
@@ -103,23 +117,32 @@ class Camera():
         initial view and the dolly distance to the print platform.
         """
         dims = build_dimensions
-        self.platformcenter = (-dims[3] - dims[0] / 2,
-                               -dims[4] - dims[1] / 2)
-        self.platform = (dims[0], dims[1])
+        self.platformcenter[0] = dims[3] + dims[0] / 2
+        self.platformcenter[1] = dims[4] + dims[1] / 2
+        self.platformcenter[2] = 0.0
+        self.platform = (dims[0], dims[1], dims[2])
         self.dist = max(dims[:2])
         self.MAX_DISTANCE = 6.0 * self.dist
+        self._calc_outer_bounds()
 
         if setview:
             self._set_initial_view()
 
+    def _calc_outer_bounds(self):
+        offset = 1.5
+        self.scene_bounds[0][0] = - offset * self.platform[0]
+        self.scene_bounds[0][1] = - offset * self.platform[1]
+        self.scene_bounds[0][2] = - offset * self.platform[2]
+        self.scene_bounds[1][0] = (1 + offset) * self.platform[0]
+        self.scene_bounds[1][1] = (1 + offset) * self.platform[1]
+        self.scene_bounds[1][2] = (1 + offset) * self.platform[2]
+
     def _set_initial_view(self) -> None:
-        self._eye = np.array((-self.platformcenter[0],
-                             -self.platformcenter[1],
+        self._eye = np.array((self.platformcenter[0],
+                             self.platformcenter[1],
                              self.dist * 1.5))
 
-        self._target = np.array((-self.platformcenter[0],
-                                -self.platformcenter[1],
-                                0.0))
+        self._target = self.platformcenter.copy()
         self._rebuild_view_mat()
 
     def reset_view_matrix(self) -> None:
@@ -149,10 +172,10 @@ class Camera():
                                                self.width * ddf,
                                                -self.height * ddf,
                                                self.height * ddf,
-                                               0.01, 3 * self.dist)
+                                               0.1, 2.0 * self.MAX_DISTANCE)
         else:
             self._proj_mat = mat4_perspective(self.FOV, self.width / self.height,
-                                              0.1, 1.2 * self.MAX_DISTANCE)
+                                              0.1, 2.0 * self.MAX_DISTANCE)
         self._has_changed = True
 
     def _rebuild_ortho2d_mat(self) -> None:
@@ -175,6 +198,7 @@ class Camera():
 
         self._rebuild_view_mat()
 
+    @debug_info
     def fit_to_model(self,
                      bounding_sphere: Tuple[Tuple[float, float, float], float]
                      ) -> None:
@@ -206,20 +230,15 @@ class Camera():
 
         self._rebuild_view_mat()
 
+    @debug_info
     def zoom(self, factor: float,
              to_cursor: Optional[Tuple[float, float]] = None,
              rebuild_mat: bool = True) -> None:
 
-        # FIXME: Setting boundaries for min and max zoom distance proofed to
-        # have side effects. Consider implementing a better approach later.
-        # Hint: Correlation between canvas resolution, aspect ratio, etc ?
-        limit_zoom = False
-
         if self.is_orthographic:
-            df = self.dolly_factor * 1 / factor
-            if limit_zoom and (df >= 0.8 or df <= 0.01):
+            df = self.dolly_factor / factor
+            if df <= 0.001 or df >= 0.8:
                 return
-
             self.dolly_factor = df
             self._rebuild_proj_mat()
 
@@ -232,61 +251,72 @@ class Camera():
                 self._eye = dolly_delta + self._eye
                 self._target = dolly_delta + self._target
         else:
-            if to_cursor:
-                cursor_vec = mouse_to_3d(to_cursor[0], to_cursor[1], 1.0,
-                                         self, (self.width, self.height))
-                cursor_dir = self._eye - cursor_vec
-                cursor_udir = cursor_dir / vec_length(cursor_dir)
+            if not to_cursor:
+                # Use screen center
+                to_cursor = (self.width / 2, self.height / 2)
 
-                forward = self._target - self._eye
-                length = vec_length(forward)
-                uforward = forward / length
+            current_forward = self._target - self._eye
+            current_distance = vec_length(current_forward)
+            current_direction = current_forward / current_distance
 
-                delta_vec = cursor_udir * length * (1.0 - factor)
-                new_length = length * 1 / factor
+            cursor_vec = mouse_to_plane(to_cursor[0], to_cursor[1],
+                                        (0.0, 0.0, 1.0), 0.0, self,
+                                        (self.width, self.height))
 
-                if limit_zoom and \
-                    (new_length > self.MAX_DISTANCE or new_length < self.MIN_DISTANCE):
-                    return
+            if cursor_vec is None:
+                # No intersection with platform has been found, use camera target plane
+                cursor_vec = mouse_to_plane(to_cursor[0], to_cursor[1],
+                                            tuple(-current_direction), 0.0, self,
+                                            (self.width, self.height))
+            if cursor_vec is None:
+                # No valid intersection has been found, don't move camera
+                return
 
-                self._eye = self._eye + delta_vec
-                self._target = self._eye + uforward * new_length
-                if self._target[2] < 0.0:
-                    # We don't want the pivot to go lower than the platform
-                    self._target = self._set_target_to_ground(self._target,
-                                                             self._eye,
-                                                             uforward)
-                #print(f"newL: {new_length}, eye: {self._eye}, target: {self._target}")
-            else:
-                eye = self._target + (self._eye - self._target) * 1 / factor
-                forward = self._target - eye
-                new_length = vec_length(forward)
+            new_distance = np.clip(current_distance / factor,
+                                   self.MIN_DISTANCE, self.MAX_DISTANCE)
 
-                if limit_zoom and \
-                    (new_length > self.MAX_DISTANCE or new_length < self.MIN_DISTANCE):
-                    return
+            t = (current_distance - new_distance) / current_distance
 
-                self._eye = eye
+            self._target += (cursor_vec - self._target) * t
+            self._target = self._clamp_to_boundaries(self._target)
+            self._eye = self._target - current_direction * new_distance
 
         if rebuild_mat:
             self._rebuild_view_mat()
 
-    def _set_target_to_ground(self, target_vec: np.ndarray, eye_vec: np.ndarray,
-                              unit_direction: np.ndarray) -> np.ndarray:
-        """
-        Calculates the point where the camera direction hits the
-        ground plane (platform plane).
-        Returns either a new target vector or the given target vector.
-        """
-        plane_normal = np.array((0.0, 0.0, 1.0))
-        q = unit_direction.dot(plane_normal)
-        if q == 0:
-            return target_vec
-        t = - (eye_vec.dot(plane_normal)) / q
-        if t < 0:
-            return target_vec
+    def _clamp_to_boundaries(self, target_vec: np.ndarray) -> np.ndarray:
+        # padding
+        scene_min = self.scene_bounds[0]
+        scene_max = self.scene_bounds[1]
 
-        return eye_vec + t * unit_direction
+        # center + comfort sphere
+        scene_center = (scene_min + scene_max) * 0.5
+        scene_center[2] = 15.0  # set center-z close to build platform
+        scene_radius = self.MAX_DISTANCE  #np.linalg.norm(scene_max - scene_center) * 1.4
+
+        # hard physical clamp
+        target = np.minimum(np.maximum(target_vec, scene_min), scene_max)
+
+        # soft orbit clamp
+        center_vec = target - scene_center
+        center_distance = np.linalg.norm(center_vec)
+        if center_distance > scene_radius:
+            target = scene_center + center_vec / center_distance * scene_radius
+
+        return target
+
+    def _validate_delta(self, target_vec: np.ndarray,
+                        delta: np.ndarray) -> np.ndarray:
+        for i in range(3):
+            coord = target_vec[i] + delta[i]
+            if coord < self.scene_bounds[0][i]:
+                delta[i] = self.scene_bounds[0][i] - target_vec[i]
+                pass
+            elif coord > self.scene_bounds[1][i]:
+                delta[i] = self.scene_bounds[1][i] - target_vec[i]
+                pass
+
+        return delta
 
     def _orbit(self, p1x: float, p1y: float,
                p2x: float, p2y: float) -> Tuple[float, float, float, float]:
@@ -298,6 +328,7 @@ class Camera():
 
         return mulquat(rot_a, rot_z)
 
+    @debug_info
     def handle_rotation(self, event: MouseEvent) -> None:
         if self.init_rot_pos is None:
             self.init_rot_pos = [self.display_ppi_factor * val for val in event.GetPosition()]
@@ -325,6 +356,7 @@ class Camera():
             self._rebuild_view_mat()
             self.init_rot_pos = p2
 
+    @debug_info
     def handle_translation(self, event: MouseEvent) -> None:
         if self.init_trans_pos is None:
             self.init_trans_pos = [self.display_ppi_factor * val for val in event.GetPosition()]
@@ -341,6 +373,7 @@ class Camera():
                 df = self._current_dolly_factor()
                 delta = (vec1 - vec2) * df
 
+            delta = self._validate_delta(self._target, delta)
             self._eye = delta + self._eye
             self._target = delta + self._target
 
@@ -356,7 +389,7 @@ class Camera():
         dolly_dist = vec_length(forward)
         dolly_limits = self.MAX_DISTANCE - self.MIN_DISTANCE
 
-        return dolly_dist / dolly_limits
+        return dolly_dist / (2 * dolly_limits)
 
     def _rebuild_view_mat(self) -> None:
         self._view_mat = self._look_at(self._eye , self._target, self._up)

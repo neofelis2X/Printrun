@@ -135,8 +135,13 @@ def mouse_to_plane(x: float, y: float,
                    canvas_size: Tuple[float, float]
                    ) -> Union[np.ndarray, None]:
     """Ray/plane intersection"""
-    ray_near, ray_far = mouse_to_ray(x, y, camera, canvas_size)
-    ray_forward = ray_far - ray_near
+    ray = mouse_to_ray(x, y, camera, canvas_size)
+    return intersect_ray_plane(ray, plane_normal, plane_offset)
+
+def intersect_ray_plane(ray: Tuple[np.ndarray, np.ndarray],
+                        plane_normal: Tuple[float, float, float],
+                        plane_offset: float) -> Union[np.ndarray, None]:
+    ray_forward = ray[1] - ray[0]
     ray_dir = ray_forward / np.linalg.norm(ray_forward)
 
     plane_normal_np = np.array(plane_normal)
@@ -144,11 +149,11 @@ def mouse_to_plane(x: float, y: float,
     if q == 0:
         return None
 
-    t = - (ray_near.dot(plane_normal_np) + plane_offset) / q
+    t = - (ray[0].dot(plane_normal_np) + plane_offset) / q
     if t < 0:
         return None
 
-    return np.add(ray_near, t * ray_dir)
+    return np.add(ray[0], t * ray_dir)
 
 def quat_rotate_vec(quat: Tuple[float, float, float, float],
                      vector_list: List[np.ndarray]) -> List[np.ndarray]:
