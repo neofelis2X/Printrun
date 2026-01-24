@@ -17,8 +17,9 @@ from threading import Lock
 
 import numpy as np
 
-from .mathutils import vec_length, mulquat, trackball, mat4_orthographic, \
-                       mat4_perspective, axis_to_quat, quat_rotate_vec
+from .mathutils import vec_length, mulquat, trackball, mouse_to_3d, \
+                       mat4_orthographic, mat4_perspective, axis_to_quat, \
+                       quat_rotate_vec
 
 # for type hints
 from typing import Optional, Tuple, TYPE_CHECKING
@@ -32,6 +33,8 @@ class Camera():
 
     LOCK = Lock()
     FOV = 45.0
+    MIN_DISTANCE = 3.0  # mm
+    MAX_DISTANCE = 1000.0
 
     def __init__(self, parent: 'wxGLPanel', build_dimensions: Build_Dims,
                  ortho: bool = True) -> None:
@@ -104,6 +107,7 @@ class Camera():
                                -dims[4] - dims[1] / 2)
         self.platform = (dims[0], dims[1])
         self.dist = max(dims[:2])
+        self.MAX_DISTANCE = 6.0 * self.dist
 
         if setview:
             self._set_initial_view()
@@ -148,7 +152,7 @@ class Camera():
                                                0.01, 3 * self.dist)
         else:
             self._proj_mat = mat4_perspective(self.FOV, self.width / self.height,
-                                              0.1, 5.5 * self.dist)
+                                              0.1, 1.2 * self.MAX_DISTANCE)
         self._has_changed = True
 
     def _rebuild_ortho2d_mat(self) -> None:
@@ -220,17 +224,17 @@ class Camera():
             self._rebuild_proj_mat()
 
             if to_cursor:
-                cursor_vec = np.array(self.canvas.mouse_to_3d(to_cursor[0],
-                                                              to_cursor[1]))
-                center_vec = np.array(self.canvas.mouse_to_3d(self.width / 2,
-                                                              self.height / 2))
-                dolly_delta =(cursor_vec - center_vec) * (1.0 - 1 / factor)
+                cursor_vec = mouse_to_3d(to_cursor[0], to_cursor[1], 1.0,
+                                         self, (self.width, self.height))
+                center_vec = mouse_to_3d(self.width / 2, self.height / 2, 1.0,
+                                         self, (self.width, self.height))
+                dolly_delta = (cursor_vec - center_vec) * (1.0 - 1 / factor)
                 self._eye = dolly_delta + self._eye
                 self._target = dolly_delta + self._target
         else:
             if to_cursor:
-                cursor_vec = np.array(self.canvas.mouse_to_3d(to_cursor[0],
-                                                              to_cursor[1]))
+                cursor_vec = mouse_to_3d(to_cursor[0], to_cursor[1], 1.0,
+                                         self, (self.width, self.height))
                 cursor_dir = self._eye - cursor_vec
                 cursor_udir = cursor_dir / vec_length(cursor_dir)
 
@@ -242,7 +246,7 @@ class Camera():
                 new_length = length * 1 / factor
 
                 if limit_zoom and \
-                    (new_length > 5 * self.dist or new_length < 6.0):
+                    (new_length > self.MAX_DISTANCE or new_length < self.MIN_DISTANCE):
                     return
 
                 self._eye = self._eye + delta_vec
@@ -252,14 +256,14 @@ class Camera():
                     self._target = self._set_target_to_ground(self._target,
                                                              self._eye,
                                                              uforward)
-
+                #print(f"newL: {new_length}, eye: {self._eye}, target: {self._target}")
             else:
                 eye = self._target + (self._eye - self._target) * 1 / factor
-                forward = eye - self._target
+                forward = self._target - eye
                 new_length = vec_length(forward)
 
                 if limit_zoom and \
-                    (new_length > 5 * self.dist or new_length < 6.0):
+                    (new_length > self.MAX_DISTANCE or new_length < self.MIN_DISTANCE):
                     return
 
                 self._eye = eye
@@ -328,8 +332,8 @@ class Camera():
             p1 = self.init_trans_pos
             p2 = [self.display_ppi_factor * val for val in event.GetPosition()]
 
-            vec1 = np.array(self.canvas.mouse_to_3d(p1[0], p1[1]))
-            vec2 = np.array(self.canvas.mouse_to_3d(p2[0], p2[1]))
+            vec1 = mouse_to_3d(p1[0], p1[1], 1.0, self, (self.width, self.height))
+            vec2 = mouse_to_3d(p2[0], p2[1], 1.0, self, (self.width, self.height))
 
             if self.is_orthographic:
                 delta = vec1 - vec2
@@ -350,7 +354,7 @@ class Camera():
         """
         forward = self._eye - self._target
         dolly_dist = vec_length(forward)
-        dolly_limits = 5 * self.dist - 6.0
+        dolly_limits = self.MAX_DISTANCE - self.MIN_DISTANCE
 
         return dolly_dist / dolly_limits
 
