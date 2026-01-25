@@ -20,6 +20,8 @@ import wx
 from .gui.widgets import get_space
 from .gui.utils import get_iconbundle
 from .utils import install_locale
+from .gl import mathutils
+
 install_locale('pronterface')
 
 def patch_method(obj, method, replacement):
@@ -165,23 +167,27 @@ class PlaterPanel(wx.Panel):
                 else:
                     if event.GetModifiers() == wx.MOD_SHIFT:
                         p1 = self.init_rot_pos
-                        init_position = self.canvas.mouse_to_plane(p1[0], p1[1],
-                                                    plane_normal = (0, 0, 1), plane_offset = 0)
+                        init_position = mathutils.mouse_to_plane(p1[0], p1[1],
+                                                                 (0.0, 0.0, 1.0), 0.0,
+                                                                 self.canvas.camera,
+                                                                 (self.canvas.width, self.canvas.height))
 
                         p2 = event.GetPosition() * self.display_ppi_factor
 
-                        drag_position = self.canvas.mouse_to_plane(p2[0], p2[1],
-                                                    plane_normal = (0, 0, 1), plane_offset = 0)
+                        drag_position = mathutils.mouse_to_plane(p2[0], p2[1],
+                                                                 (0.0, 0.0, 1.0), 0.0,
+                                                                 self.canvas.camera,
+                                                                 (self.canvas.width, self.canvas.height))
 
-                        if drag_position is not None:
+                        if drag_position is not None and init_position is not None:
                             self.canvas.parent.move_shape((drag_position[0] - init_position[0],
                                                            drag_position[1] - init_position[1]))
                             self.init_rot_pos = p2
                     else:
                         orig_handler(event)
+
             patch_method(viewer.camera, "handle_rotation", handle_rotation)
-            viewer.focus.update_color(self.gl_bg_colour)
-            viewer.platform.update_color(self.gl_bg_colour)
+            viewer.update_background_color(self.gl_bg_colour)
 
         # Patch handle_wheel on the fly
         if hasattr(viewer, "handle_wheel_shift"):

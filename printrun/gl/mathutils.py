@@ -19,7 +19,7 @@ import numpy as np
 from pyglet import gl
 
 # for type hints
-from typing import List, Tuple, TYPE_CHECKING
+from typing import List, Tuple, Union, TYPE_CHECKING
 from ctypes import Array
 if TYPE_CHECKING:
     from .camera import Camera
@@ -107,15 +107,48 @@ def mulquat(q1: Tuple[float, float, float, float],
 
 def mouse_to_3d(x: float, y: float, z: float, camera: 'Camera',
                 canvas_size: Tuple[float, float]) -> np.ndarray:
-    point = np.zeros(3)
+    """Point in 3D space from cursor position and z-value"""
     y = canvas_size[1] - y
-
     mvmat = camera.view
     pmat = camera.projection
     viewport = (0.0, 0.0, canvas_size[0], canvas_size[1])
 
-    point = np.array(np_unproject(x, y, z, mvmat, pmat, viewport))
-    return point
+    return np_unproject(x, y, z, mvmat, pmat, viewport)
+
+def mouse_to_ray(x: float, y: float, camera: 'Camera',
+                 canvas_size: Tuple[float, float]
+                 ) -> Tuple[np.ndarray, np.ndarray]:
+    """Ray from z-depth 1.0 to 0.0"""
+    y = canvas_size[1] - y
+    mvmat = camera.view
+    pmat = camera.projection
+    viewport = (0.0, 0.0, canvas_size[0], canvas_size[1])
+
+    ray_far = np_unproject(x, y, 1.0, mvmat, pmat, viewport)
+    ray_near = np_unproject(x, y, 0.0, mvmat, pmat, viewport)
+    return ray_near, ray_far
+
+def mouse_to_plane(x: float, y: float,
+                   plane_normal: Tuple[float, float, float],
+                   plane_offset: float,
+                   camera: 'Camera',
+                   canvas_size: Tuple[float, float]
+                   ) -> Union[np.ndarray, None]:
+    """Ray/plane intersection"""
+    ray_near, ray_far = mouse_to_ray(x, y, camera, canvas_size)
+    ray_forward = ray_far - ray_near
+    ray_dir = ray_forward / np.linalg.norm(ray_forward)
+
+    plane_normal_np = np.array(plane_normal)
+    q = ray_dir.dot(plane_normal_np)
+    if q == 0:
+        return None
+
+    t = - (ray_near.dot(plane_normal_np) + plane_offset) / q
+    if t < 0:
+        return None
+
+    return np.add(ray_near, t * ray_dir)
 
 def quat_rotate_vec(quat: Tuple[float, float, float, float],
                      vector_list: List[np.ndarray]) -> List[np.ndarray]:
