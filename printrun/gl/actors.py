@@ -433,8 +433,8 @@ class MouseCursor(ActorBaseClass):
     def modelmatrix(self):
         return self._modelmatrix
 
-    def update(self, position_3d: Tuple[float, float, float]) -> None:
-        self._modelmatrix = mat4_translation(*position_3d)
+    def update(self, position_3d: np.ndarray) -> None:
+        self._modelmatrix = mat4_translation(*position_3d[:3])
 
     def load(self, shader, ubo) -> None:
         self.shaderlist = shader

@@ -25,8 +25,7 @@ import numpy as np
 
 from . import stltool
 from .gl.panel import wxGLPanel
-from .gl import actors
-from .gl import renderer
+from .gl import actors, mathutils
 
 from .utils import install_locale
 install_locale("pronterface")
@@ -139,9 +138,9 @@ class StlViewPanel(wxGLPanel):
         '''called in the middle of ondraw after the buffer has been cleared'''
 
         # Draw mouse
-        intersection = self.mouse_to_plane(self.mousepos[0], self.mousepos[1],
-                                           plane_normal = (0, 0, 1),
-                                           plane_offset = 0)
+        intersection = mathutils.mouse_to_plane(self.mousepos[0], self.mousepos[1],
+                                                (0.0, 0.0, 1.0), 0.0,
+                                                self.camera, (self.width, self.height))
 
         if intersection is not None:
             self.gl_cursor.update(intersection)
@@ -205,9 +204,9 @@ class StlViewPanel(wxGLPanel):
         ref_plane = ref_planes[cutting_axis]
         ref_offset = ref_offsets[cutting_axis]
 
-        inter = self.mouse_to_plane(self.mousepos[0], self.mousepos[1],
-                                    plane_normal = ref_plane,
-                                    plane_offset = ref_offset)
+        inter = mathutils.mouse_to_plane(self.mousepos[0], self.mousepos[1],
+                                         ref_plane, ref_offset,
+                                         self.camera, (self.width, self.height))
 
         max_size = max((self.platform.width,
                         self.platform.depth,
@@ -221,9 +220,9 @@ class StlViewPanel(wxGLPanel):
             ref_plane = fallback_ref_planes[cutting_axis]
             ref_offset = fallback_ref_offsets[cutting_axis]
 
-            inter = self.mouse_to_plane(self.mousepos[0], self.mousepos[1],
-                                        plane_normal = ref_plane,
-                                        plane_offset = ref_offset)
+            inter = mathutils.mouse_to_plane(self.mousepos[0], self.mousepos[1],
+                                             ref_plane, ref_offset,
+                                             self.camera, (self.width, self.height))
 
             if inter is not None and np.fabs(inter).max() + max_size / 2 < 2 * max_size:
                 dist = inter[translate_axis[cutting_axis]]

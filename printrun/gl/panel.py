@@ -34,7 +34,6 @@ from pyglet.gl import glEnable,glBlendFunc,glViewport, glClear, \
 
 from pyglet import gl
 
-from .mathutils import np_unproject
 from . import renderer
 from . import actors
 from . import camera
@@ -44,7 +43,7 @@ from printrun.utils import install_locale
 install_locale("pronterface")
 
 # for type hints
-from typing import Any, Tuple, Union
+from typing import Any, Tuple
 from printrun import stltool
 from printrun import gcoder
 Build_Dims = Tuple[int, int, int, int, int, int]
@@ -395,35 +394,6 @@ class wxGLPanel(BASE_CLASS):
         self.set_current_context()
         self.focus.update_color(color)
         self.platform.update_color(color)
-
-    def mouse_to_ray(self, x: float, y: float
-                     ) -> Tuple[np.ndarray, np.ndarray]:
-        # Ray from z-depth 1.0 to 0.0
-        y = self.height - y
-        mvmat = self.camera.view
-        pmat = self.camera.projection
-        viewport = (0.0, 0.0, self.width, self.height)
-
-        ray_far = np_unproject(x, y, 1.0, mvmat, pmat, viewport)
-        ray_near = np_unproject(x, y, 0.0, mvmat, pmat, viewport)
-        return ray_near, ray_far
-
-    def mouse_to_plane(self, x: float, y: float,
-                       plane_normal: Tuple[float, float, float],
-                       plane_offset: float
-                       ) -> Union[Tuple[float, float, float], None]:
-        # Ray/plane intersection
-        ray_near, ray_far = self.mouse_to_ray(x, y)
-        ray_dir = ray_far - ray_near
-        ray_dir = ray_dir / np.linalg.norm(ray_dir)
-        plane_normal_np = np.array(plane_normal)
-        q = ray_dir.dot(plane_normal_np)
-        if q == 0:
-            return None
-        t = - (ray_near.dot(plane_normal_np) + plane_offset) / q
-        if t < 0:
-            return None
-        return ray_near + t * ray_dir
 
     def double_click(self, event: wx.MouseEvent) -> None:
         if hasattr(self.parent, "clickcb") and self.parent.clickcb:
