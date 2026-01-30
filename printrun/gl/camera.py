@@ -197,7 +197,7 @@ class Camera():
 
         self._rebuild_view_mat()
 
-    @debug_info
+    # @debug_info
     def fit_to_model(self,
                      bounding_sphere: Tuple[Tuple[float, float, float], float]
                      ) -> None:
@@ -229,7 +229,7 @@ class Camera():
 
         self._rebuild_view_mat()
 
-    @debug_info
+    # @debug_info
     def zoom(self, factor: float,
              to_cursor: Optional[Tuple[float, float]] = None,
              rebuild_mat: bool = True) -> None:
@@ -296,9 +296,6 @@ class Camera():
         self._target = dolly_delta + self._target
 
     # TODO:
-    # change validate delta to valideta target
-    # try clamp boundaries with translation method
-    # remove debug info
     # check for correct clipping range
     # delete move_rel
 
@@ -346,7 +343,7 @@ class Camera():
 
         return mulquat(rot_a, rot_z)
 
-    @debug_info
+    # @debug_info
     def handle_rotation(self, event: MouseEvent) -> None:
         if self.init_rot_pos is None:
             self.init_rot_pos = [self.display_ppi_factor * val for val in event.GetPosition()]
@@ -374,7 +371,7 @@ class Camera():
             self._rebuild_view_mat()
             self.init_rot_pos = p2
 
-    @debug_info
+    # @debug_info
     def handle_translation(self, event: MouseEvent) -> None:
         if self.init_trans_pos is None:
             self.init_trans_pos = [self.display_ppi_factor * val for val in event.GetPosition()]
