@@ -185,18 +185,6 @@ class Camera():
                                               self.height, -1.0, 1.0)
         self._has_changed = True
 
-    def move_rel(self, x: float, y: float, z: float) -> None:
-        """
-        Translate the camera by (x, y, z) in the global coordinate system of
-        the scene.
-        """
-        delta = np.array((x, y, z))
-
-        self._eye = delta + self._eye
-        self._target = delta + self._target
-
-        self._rebuild_view_mat()
-
     # @debug_info
     def fit_to_model(self,
                      bounding_sphere: Tuple[Tuple[float, float, float], float]
@@ -294,10 +282,6 @@ class Camera():
         dolly_delta = (cursor_vec - center_vec) * (1.0 - 1 / factor)
         self._eye = dolly_delta + self._eye
         self._target = dolly_delta + self._target
-
-    # TODO:
-    # check for correct clipping range
-    # delete move_rel
 
     def _clamp_to_boundaries(self, target_vec: np.ndarray) -> np.ndarray:
         # padding
