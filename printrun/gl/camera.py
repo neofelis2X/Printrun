@@ -31,7 +31,6 @@ if TYPE_CHECKING:
 
 def debug_info(method):
     def wrapper(self, *args, **kwargs):
-        #print("Before method execution")
         output = method(self, *args, **kwargs)
         v = self._target
         print(f"Target: \t({v[0]:.3f}, {v[1]:.3f}, {v[2]:.3f})")
@@ -123,12 +122,12 @@ class Camera():
         self.platform = (dims[0], dims[1], dims[2])
         self.dist = max(dims[:2])
         self.MAX_DISTANCE = 6.0 * self.dist
-        self._calc_outer_bounds()
+        self._calc_scene_bounds()
 
         if setview:
             self._set_initial_view()
 
-    def _calc_outer_bounds(self):
+    def _calc_scene_bounds(self):
         offset = 1.5
         self.scene_bounds[0][0] = - offset * self.platform[0]
         self.scene_bounds[0][1] = - offset * self.platform[1]
@@ -236,21 +235,16 @@ class Camera():
              rebuild_mat: bool = True) -> None:
 
         if self.is_orthographic:
-            df = self.dolly_factor / factor
-            if df <= 0.001 or df >= 0.8:
-                return
-            self.dolly_factor = df
-            self._rebuild_proj_mat()
-
-            if to_cursor:
-                cursor_vec = mouse_to_3d(to_cursor[0], to_cursor[1], 1.0,
-                                         self, (self.width, self.height))
-                center_vec = mouse_to_3d(self.width / 2, self.height / 2, 1.0,
-                                         self, (self.width, self.height))
-                dolly_delta = (cursor_vec - center_vec) * (1.0 - 1 / factor)
-                self._eye = dolly_delta + self._eye
-                self._target = dolly_delta + self._target
+            self._dolly_orthographic(factor, to_cursor)
         else:
+            self._dolly_perspective(factor, to_cursor)
+
+        if rebuild_mat:
+            self._rebuild_view_mat()
+
+    def _dolly_perspective(self, factor: float,
+                           to_cursor: Optional[Tuple[float, float]] = None
+                           ) -> None:
             if not to_cursor:
                 # Use screen center
                 to_cursor = (self.width / 2, self.height / 2)
@@ -281,8 +275,32 @@ class Camera():
             self._target = self._clamp_to_boundaries(self._target)
             self._eye = self._target - current_direction * new_distance
 
-        if rebuild_mat:
-            self._rebuild_view_mat()
+    def _dolly_orthographic(self, factor: float,
+                            to_cursor: Optional[Tuple[float, float]] = None
+                            ) -> None:
+        df = self.dolly_factor / factor
+        if df <= 0.001 or df >= 0.8:
+            return
+        self.dolly_factor = df
+        self._rebuild_proj_mat()
+
+        if not to_cursor:
+            return
+
+        cursor_vec = mouse_to_3d(to_cursor[0], to_cursor[1], 1.0,
+                                 self, (self.width, self.height))
+        center_vec = mouse_to_3d(self.width / 2, self.height / 2, 1.0,
+                                 self, (self.width, self.height))
+        dolly_delta = (cursor_vec - center_vec) * (1.0 - 1 / factor)
+        self._eye = dolly_delta + self._eye
+        self._target = dolly_delta + self._target
+
+    # TODO:
+    # change validate delta to valideta target
+    # try clamp boundaries with translation method
+    # remove debug info
+    # check for correct clipping range
+    # delete move_rel
 
     def _clamp_to_boundaries(self, target_vec: np.ndarray) -> np.ndarray:
         # padding
@@ -292,7 +310,7 @@ class Camera():
         # center + comfort sphere
         scene_center = (scene_min + scene_max) * 0.5
         scene_center[2] = 15.0  # set center-z close to build platform
-        scene_radius = self.MAX_DISTANCE  #np.linalg.norm(scene_max - scene_center) * 1.4
+        scene_radius = self.MAX_DISTANCE
 
         # hard physical clamp
         target = np.minimum(np.maximum(target_vec, scene_min), scene_max)
@@ -401,7 +419,7 @@ class Camera():
         """
         Classic gluLookAt implementation that takes in numpy arrays for
         the vector eye, center (target) and global up and returns a 4x4
-        view matrix as c_types_Array
+        view matrix as a numpy array
         """
         # Calculate the forward vector (z-axis in camera space)
         forward = center - eye
