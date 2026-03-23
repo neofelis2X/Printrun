@@ -71,7 +71,7 @@ class wxGLPanel(BASE_CLASS):
     color_background = (200 / 255, 225 / 255, 250 / 255, 1.0)  # Light Blue
 
     wheelTimestamp = None
-    show_frametime = False
+    debug_features = False
 
     def __init__(self, parent, pos: wx.Point = wx.DefaultPosition,
                  size: wx.Size = wx.DefaultSize, style = 0,
@@ -119,7 +119,7 @@ class wxGLPanel(BASE_CLASS):
                                           self.fit, self.resetview,
                                           self.reload_shader)
 
-        if self.show_frametime:
+        if self.debug_features:
             self.init_frametime()
 
         ctx_attrs = glcanvas.GLContextAttrs()
@@ -322,7 +322,7 @@ class wxGLPanel(BASE_CLASS):
         wx.CallAfter(self.Refresh)
 
     def reload_shader(self) -> None:
-        if not self.show_frametime:
+        if not self.debug_features:
             return
 
         new_shader = renderer.load_shader()
@@ -349,7 +349,7 @@ class wxGLPanel(BASE_CLASS):
         if self.camera.has_changed:
             renderer.update_ubo_view(self.ubo, self.camera)
 
-        if self.show_frametime:
+        if self.debug_features:
             self.frametime.start_frame()
 
         glClearColor(*self.color_background)
@@ -363,7 +363,7 @@ class wxGLPanel(BASE_CLASS):
         self.platform.draw()
         self.canvas.SwapBuffers()
 
-        if self.show_frametime:
+        if self.debug_features:
             self.frametime.end_frame()
             self.frametime_counter.SetLabel(self.frametime.get())
 

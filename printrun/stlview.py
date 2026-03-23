@@ -264,7 +264,7 @@ def main() -> None:
                              perspective = persp,
                              )
 
-    stl_panel.show_frametime = True
+    stl_panel.debug_features = True
     stl_panel.init_frametime()
     stl_panel.set_current_context()
 
