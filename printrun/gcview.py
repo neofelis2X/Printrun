@@ -443,7 +443,7 @@ if __name__ == "__main__":
                            perspective = persp)
     frame.SetMinClientSize((200, 200))
 
-    frame.glpanel.show_frametime = True
+    frame.glpanel.debug_features = True
     frame.glpanel.init_frametime()
     frame.glpanel.set_current_context()
 
