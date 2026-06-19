@@ -15,48 +15,58 @@ in VertexData {
     vec3 fNormal;
 } fs_in;
 
-const vec3 lightDiffColor = vec3(0.8);
-const vec3 lightSpecColor = vec3(1.0);
-const float ambientStrength = 0.2;
-const float specularStrength = 0.7;
-const int shininess = 128; // 2 - 256
-
-const int NUM_LIGHTS = 3;
-const vec3 lightPos[NUM_LIGHTS] = vec3[](
-        vec3(900.0, 2800.0, 1700.0),
-        vec3(-1200.0, -1000.0, 2200.0),
-        vec3(-600.0, 800.0, -1000.0)
-    );
-
 out vec4 FragColor;
 
-void main() {
-    // Ambient Light
-    vec3 ambient = ambientStrength * lightDiffColor;
+struct Material {
+    vec3 ambient;
+    vec3 diffuse;
+    vec3 specular;
+    uint shininess;
+};
 
-    vec3 norm = fs_in.fNormal;
-    vec3 viewDir = normalize(ViewPos - fs_in.fPos);
+struct Light {
+    vec3 position;
+    vec3 ambient;
+    vec3 diffuse;
+    vec3 specular;
+};
+
+Material material = Material(fs_in.fColor.rgb, fs_in.fColor.rgb, vec3(1.0f), 140u);
+
+const uint NUM_LIGHTS = 3u;
+const Light light[NUM_LIGHTS] = Light[](
+        Light(vec3(1300.0f, 200.0f, 1100.0f), vec3(0.12f), vec3(0.4f), vec3(1.0f)),
+        Light(vec3(-1200.0f, 1400.0f, 1100.0f), vec3(0.12f), vec3(0.5f), vec3(1.0f)),
+        Light(vec3(-1000.0f, -900.0f, 1100.0f), vec3(0.12f), vec3(0.3f), vec3(1.0f))
+    );
+
+void main() {
+    vec3 viewDirection = normalize(ViewPos - fs_in.fPos);
+    vec3 normal = normalize(fs_in.fNormal);
     vec3 lightResult = vec3(0.0);
 
-    for (int i = 0; i < NUM_LIGHTS; ++i) {
+    for (uint i = 0u; i < NUM_LIGHTS; i++) {
+        // Ambient Light
+        vec3 ambient = light[i].ambient * material.ambient;
+
         // Diffuse Light
-        vec3 lightDir = normalize(lightPos[i] - fs_in.fPos);
-        float diff = max(dot(norm, lightDir), 0.0);
-        vec3 diffuse = diff * lightDiffColor;
+        vec3 lightDirection = normalize(light[i].position - fs_in.fPos);
+        float diff = max(dot(normal, lightDirection), 0.0);
+        vec3 diffuse = light[i].diffuse * (diff * material.diffuse);
 
         // Spec
-        vec3 reflectDir = reflect(-lightDir, norm);
-        float spec = pow(max(dot(viewDir, reflectDir), 0.0), shininess);
-        vec3 specular = specularStrength * spec * lightSpecColor;
+        vec3 reflectDirection = reflect(-lightDirection, normal);
+        float spec = pow(max(dot(viewDirection, reflectDirection), 0.0), material.shininess);
+        vec3 specular = light[i].specular * (spec * material.specular);
 
-        lightResult += diffuse + specular;
+        lightResult += ambient + diffuse + specular;
     }
 
     vec3 result;
     if (gl_FrontFacing) {
         result = lightResult * fs_in.fColor.rgb;
     } else {
-        result = lightResult * fs_in.fColor.rgb * vec3(0.4, 0.4, 0.4);
+        result = lightResult * fs_in.fColor.rgb * vec3(0.4f);
     }
     FragColor = vec4(result, fs_in.fColor.a);
 }

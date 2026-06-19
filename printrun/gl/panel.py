@@ -71,7 +71,7 @@ class wxGLPanel(BASE_CLASS):
     color_background = (200 / 255, 225 / 255, 250 / 255, 1.0)  # Light Blue
 
     wheelTimestamp = None
-    debug_features = False
+    debug_features = True
 
     def __init__(self, parent, pos: wx.Point = wx.DefaultPosition,
                  size: wx.Size = wx.DefaultSize, style = 0,
@@ -336,6 +336,8 @@ class wxGLPanel(BASE_CLASS):
         self.shader["basic"] = new_shader["basic"]
         self.shader["lines"] = new_shader["lines"]
         self.shader["thicklines"] = new_shader["thicklines"]
+
+        renderer.bind_shader_ublock(self.shader, "General")
 
         for old in old_shader.values():
             old.delete()
