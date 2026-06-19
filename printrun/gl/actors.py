@@ -108,7 +108,7 @@ class ActorBaseClass(ABC):
         self.vao = GLuint(0)
         self.vbo = GLuint(0)
         self.ebo = GLuint(0)
-        self.ubo = GLuint(0)
+        self.ubo = renderer.UniformBuffer()
         self._modelmatrix = np.eye(4, dtype=np.float32, order='F')
 
     @property
@@ -116,7 +116,7 @@ class ActorBaseClass(ABC):
         return self._modelmatrix
 
     @abstractmethod
-    def load(self, shader, ubo) -> None:
+    def load(self, shader, ubo: renderer.UniformBuffer) -> None:
         ...
 
     def unload(self) -> None:
@@ -227,7 +227,7 @@ class Platform(ActorBaseClass):
         else:
             self._preload_rectangular()
 
-    def load(self, shader, ubo) -> None:
+    def load(self, shader, ubo: renderer.UniformBuffer) -> None:
         self.shaderlist = shader
         self.ubo = ubo
         self.vao, self.vbo, self.ebo = renderer.create_buffers(lines_only=True)
@@ -410,7 +410,7 @@ class Platform(ActorBaseClass):
         if not self.loaded:
             self._load()
 
-        renderer.update_ubo_transform(self.ubo, self.modelmatrix)
+        self.ubo.update_transform(self.modelmatrix)
         self.shaderlist["lines"].use()
 
         glBindVertexArray(self.vao)
@@ -436,7 +436,7 @@ class MouseCursor(ActorBaseClass):
     def update(self, position_3d: np.ndarray) -> None:
         self._modelmatrix = mat4_translation(*position_3d[:3])
 
-    def load(self, shader, ubo) -> None:
+    def load(self, shader, ubo: renderer.UniformBuffer) -> None:
         self.shaderlist = shader
         self.ubo = ubo
         self.vao, self.vbo, self.ebo = renderer.create_buffers()
@@ -487,7 +487,7 @@ class MouseCursor(ActorBaseClass):
         return (vertices, indices)
 
     def draw(self) -> None:
-        renderer.update_ubo_transform(self.ubo, self.modelmatrix)
+        self.ubo.update_transform(self.modelmatrix)
         self.shaderlist["basic"].use()
 
         glDisable(GL_CULL_FACE)
@@ -516,7 +516,7 @@ class Focus(ActorBaseClass):
 
         self.update_size()
 
-    def load(self, shader, ubo) -> None:
+    def load(self, shader, ubo: renderer.UniformBuffer) -> None:
         self.shaderlist = shader
         self.ubo = ubo
         self.vao, self.vbo, self.ebo = renderer.create_buffers(lines_only=True)
@@ -565,7 +565,7 @@ class Focus(ActorBaseClass):
         if not self.loaded:
             self._load()
 
-        renderer.update_ubo_transform(self.ubo, self.modelmatrix)
+        self.ubo.update_transform(self.modelmatrix)
         self.shaderlist["lines"].use()
         sid = self.shaderlist["lines"].id
 
@@ -602,7 +602,7 @@ class CuttingPlane(ActorBaseClass):
         self.color = (0 / 255, 229 / 255, 38 / 255, 0.3)  # Light Green
         self.color_outline = (0 / 255, 204 / 255, 38 / 255, 1.0)  # Green
 
-    def load(self, shader, ubo) -> None:
+    def load(self, shader, ubo: renderer.UniformBuffer) -> None:
         self.shaderlist = shader
         self.ubo = ubo
         self.vao, self.vbo, self.ebo = renderer.create_buffers()
@@ -673,7 +673,7 @@ class CuttingPlane(ActorBaseClass):
         if self.dist is None:
             return
 
-        renderer.update_ubo_transform(self.ubo, self.modelmatrix)
+        self.ubo.update_transform(self.modelmatrix)
         self.shaderlist["basic"].use()
         # Draw the plane
         glDisable(GL_CULL_FACE)
@@ -705,7 +705,7 @@ class MeshModel(ActorBaseClass):
         self.indices = []
         self.meshdata = model
 
-    def load(self, shader, ubo) -> None:
+    def load(self, shader, ubo: renderer.UniformBuffer) -> None:
         self.shaderlist = shader
         self.ubo = ubo
         self.vao, self.vbo, self.ebo = renderer.create_buffers()
@@ -742,7 +742,7 @@ class MeshModel(ActorBaseClass):
         renderer.fill_buffer(self.ebo, self.indices.data, GL_ELEMENT_ARRAY_BUFFER)
 
     def draw(self) -> None:
-        renderer.update_ubo_transform(self.ubo, self.modelmatrix)
+        self.ubo.update_transform(self.modelmatrix)
         self.shaderlist["basic"].use()
 
         glBindVertexArray(self.vao)
@@ -1299,7 +1299,7 @@ class GcodeModel(Model):
     # DRAWING
     # ------------------------------------------------------------------------
 
-    def load(self, shader, ubo) -> None:
+    def load(self, shader, ubo: renderer.UniformBuffer) -> None:
         self.shaderlist = shader
         self.ubo = ubo
         self._modelmatrix = mat4_translation(self.offset_x, self.offset_y, 0.0)
@@ -1331,7 +1331,7 @@ class GcodeModel(Model):
 
     def draw(self) -> None:
         glBindVertexArray(self.vao)
-        renderer.update_ubo_transform(self.ubo, self.modelmatrix)
+        self.ubo.update_transform(self.modelmatrix)
 
         with self.lock:
             self.shaderlist["basic"].use()
@@ -1639,7 +1639,7 @@ class GcodeModelLight(Model):
     # DRAWING
     # ------------------------------------------------------------------------
 
-    def load(self, shader, ubo) -> None:
+    def load(self, shader, ubo: renderer.UniformBuffer) -> None:
         self.shaderlist = shader
         self.ubo = ubo
         self._modelmatrix = mat4_translation(self.offset_x, self.offset_y, 0.0)
@@ -1671,7 +1671,7 @@ class GcodeModelLight(Model):
 
     def draw(self) -> None:
         glBindVertexArray(self.vao)
-        renderer.update_ubo_transform(self.ubo, self.modelmatrix)
+        self.ubo.update_transform(self.modelmatrix)
         with self.lock:
             self.shaderlist["lines"].use()
             self._display_movements()

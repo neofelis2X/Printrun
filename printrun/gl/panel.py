@@ -108,7 +108,7 @@ class wxGLPanel(BASE_CLASS):
         self.height = 1.0
         self.display_ppi_factor = 1.0
 
-        self.ubo = -1
+        self.ubo = renderer.UniformBuffer()
         self.shader = {}
         self.camera = camera.Camera(self, build_dimensions,
                                     ortho = not perspective)
@@ -258,7 +258,7 @@ class wxGLPanel(BASE_CLASS):
         glEnable(GL_LINE_SMOOTH)
         glEnable(GL_MULTISAMPLE)
 
-        self.ubo = renderer.create_ubo()
+        self.ubo.create_ubo()
         shader = renderer.load_shader()
         if not shader:
             logging.error("GL: Loading OpenGL shader failed.")
@@ -292,8 +292,8 @@ class wxGLPanel(BASE_CLASS):
         self.height = max(float(height), 1.0)
 
         self.camera.update_size(width, height, self.display_ppi_factor)
-        renderer.update_ubo_viewport(self.ubo, self.camera,
-                                     (self.width, self.height, self.display_ppi_factor))
+        self.ubo.update_viewport(self.camera,
+                                 (self.width, self.height, self.display_ppi_factor))
         self.focus.update_size()
 
         if not self.camera.view_matrix_initialized:
@@ -349,7 +349,7 @@ class wxGLPanel(BASE_CLASS):
         """Draw the window."""
         self.set_current_context()
         if self.camera.has_changed:
-            renderer.update_ubo_view(self.ubo, self.camera)
+            self.ubo.update_view(self.camera)
 
         if self.debug_features:
             self.frametime.start_frame()
