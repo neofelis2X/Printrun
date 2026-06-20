@@ -152,7 +152,8 @@ def get_normal_mat(model_mat: np.ndarray) -> np.ndarray:
     except np.linalg.LinAlgError as e:
         logging.warning("GL: Error inverting normal matrix: %s" % e)
         return sub
-    return inv_mat.T
+    # NOTE: inv() always returns np.float64
+    return inv_mat.T.astype(np.float32, copy=False)
 
 def interleave_vertex_data(verts, color, normal: Optional[np.ndarray]=None,
                            distinct_colors=False, distinct_normals=False):
@@ -278,69 +279,84 @@ def load_uniform(shader_id, uniform_name: str, data):
         ptr = data.ctypes.data_as(ctypes.POINTER(GLfloat))
         glUniformMatrix4fv(location, 1, GL_FALSE, ptr)
 
-
 #### UNIFORM BUFFER OJECTS ####
+# STD140 padding rules
+vec3p = GLfloat * (3 + 1)
+vec4p = GLfloat * 4
+mat3p = vec4p * 3
+mat4p = vec4p * 4
+
+class GeneralUBOStruct(ctypes.Structure):
+    _fields_ = [
+            ("ViewProjection", mat4p),
+            ("Ortho2dProjection", mat4p),
+            ("ViewPos", vec3p),
+            ("ViewportSize", vec3p),
+            ("Transform", mat4p),
+            ("NormalTransform", mat3p)
+            ]
+
 class UniformBuffer:
     def __init__(self):
         self.ubo = GLuint(0)
-        self.buffersize = 256
+        self.data = GeneralUBOStruct()
         self.is_initialised = False
 
     def create_ubo(self):
         """
         Creates a uniform buffer object on the gpu
         """
-        bytesize = ctypes.sizeof(GLfloat)
         glGenBuffers(1, self.ubo)
         glBindBuffer(GL_UNIFORM_BUFFER, self.ubo)
-        glBufferData(GL_UNIFORM_BUFFER, GLsizeiptr(self.buffersize * bytesize), None, GL_DYNAMIC_DRAW)
+        glBufferData(GL_UNIFORM_BUFFER, GLsizeiptr(ctypes.sizeof(self.data)), None, GL_DYNAMIC_DRAW)
         glBindBuffer(GL_UNIFORM_BUFFER, 0)
 
-        glBindBufferRange(GL_UNIFORM_BUFFER, 0, self.ubo, GLintptr(0), GLsizeiptr(self.buffersize * bytesize))
-        #glBindBufferRange(GL_UNIFORM_BUFFER, 1, ubo, 64 * bytesize, 8 * bytesize)
+        glBindBufferRange(GL_UNIFORM_BUFFER, 0, self.ubo, GLintptr(0), GLsizeiptr(ctypes.sizeof(self.data)))
         self.is_initialised = True
 
-    def update_view(self, camera):
+    def _upload_field(self, name: str) -> None:
+        """Push a single named field to the GPU."""
+        field = getattr(GeneralUBOStruct, name)
         glBindBuffer(GL_UNIFORM_BUFFER, self.ubo)
-
-        mat = camera.projection @ camera.view
-        data = mat.flatten(order='F')
-        offset = 0
-        eye = camera.eye
-        eye_offset = offset + 2 * data.nbytes
-        glBufferSubData(GL_UNIFORM_BUFFER, GLintptr(offset), data.nbytes, data.ctypes.data)
-        glBufferSubData(GL_UNIFORM_BUFFER, eye_offset, eye.nbytes,
-                        eye.ctypes.data)
-
+        glBufferSubData(GL_UNIFORM_BUFFER,
+                        GLintptr(field.offset),
+                        GLsizeiptr(field.size),
+                        ctypes.byref(self.data, field.offset))
         glBindBuffer(GL_UNIFORM_BUFFER, 0)
+
+    @staticmethod
+    def _set_mat(field, mat: np.ndarray, order: np._OrderKACF ='F'):
+        flat = mat.flatten(order=order).astype(np.float32, copy=False)
+        assert flat.nbytes == ctypes.sizeof(field), \
+        f"UBO field size {ctypes.sizeof(field)} != data {flat.nbytes}"
+
+        ctypes.memmove(field, flat.ctypes.data, flat.nbytes)
+
+    def update_view(self, camera):
+        mat = camera.projection @ camera.view
+        self._set_mat(self.data.ViewProjection, mat)
+        self.data.ViewPos[:3] = camera.eye[:3]
+        self._upload_field("ViewProjection")
+        self._upload_field("ViewPos")
 
     def update_viewport(self, camera, viewport):
-        glBindBuffer(GL_UNIFORM_BUFFER, self.ubo)
-        bytesize = ctypes.sizeof(GLfloat)
-
-        mat = camera.projection2d
-        offset = mat.nbytes
-        vp = np.array(viewport, dtype=np.float32)
-        vp_offset = offset + (16 + 4) * bytesize
-        glBufferSubData(GL_UNIFORM_BUFFER, offset, mat.nbytes, mat.ctypes.data)
-        glBufferSubData(GL_UNIFORM_BUFFER, vp_offset, GLintptr(vp.nbytes), vp.ctypes.data)
-
-        glBindBuffer(GL_UNIFORM_BUFFER, 0)
+        self._set_mat(self.data.Ortho2dProjection, camera.projection2d)
+        self.data.ViewportSize[:3] = viewport[:3]
+        self._upload_field("Ortho2dProjection")
+        self._upload_field("ViewportSize")
 
     def update_transform(self, transform_mat):
-        glBindBuffer(GL_UNIFORM_BUFFER, self.ubo)
-        bytesize = ctypes.sizeof(GLfloat)
-
-        tm = transform_mat
-        offset = (16 + 16 + 4 + 4) * bytesize
-        nm = get_normal_mat(tm)
-        # A 3x3 matrix has a 4x3 layout in std140, hence the padding
+        # Model matrices use row-vector convention (translation in the
+        # last row), so a row-major (C) upload yields the column-major
+        # layout OpenGL expects. Camera matrices use the opposite
+        # convention and are uploaded order='F'.
+        self._set_mat(self.data.Transform, transform_mat, order='C')
+        nm = get_normal_mat(transform_mat)  # 3x3
+        # std140 mat3: each column padded to vec4, 3x4
         nm_padded = np.pad(nm.T, ((0, 0), (0, 1)), mode="constant")
-
-        data = np.concatenate((tm, nm_padded))
-        glBufferSubData(GL_UNIFORM_BUFFER, GLintptr(offset), GLsizeiptr(data.nbytes), data.ctypes.data)
-
-        glBindBuffer(GL_UNIFORM_BUFFER, 0)
+        self._set_mat(self.data.NormalTransform, nm_padded, order='C')
+        self._upload_field("Transform")
+        self._upload_field("NormalTransform")
 
 def bind_shader_ublock(shaderlist, ublock_name: str) -> None:
     ublock_index = GLuint(0)
@@ -349,6 +365,4 @@ def bind_shader_ublock(shaderlist, ublock_name: str) -> None:
     for sh in shaderlist.values():
         ublock_index = glGetUniformBlockIndex(sh.id, byte_name)
         glUniformBlockBinding(sh.id, ublock_index, binding_point)
-
-
 
