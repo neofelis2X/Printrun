@@ -229,10 +229,10 @@ def mat4_translation(x_val: float, y_val: float,
     Returns a 4x4 translation matrix
     """
 
-    matrix = np.eye(4, dtype=np.float32, order='C')
-    matrix[3][0] = x_val
-    matrix[3][1] = y_val
-    matrix[3][2] = z_val
+    matrix = np.eye(4, dtype=np.float32, order='F')
+    matrix[0][3] = x_val
+    matrix[1][3] = y_val
+    matrix[2][3] = z_val
 
     return matrix
 
@@ -242,17 +242,17 @@ def mat4_rotation(x: float, y: float,
     Returns a 4x4 rotation matrix, enter rotation angle in degree
     """
 
-    matrix = np.eye(4, dtype=np.float32, order='C')
+    matrix = np.eye(4, dtype=np.float32, order='F')
     co = np.cos(np.radians(angle_deg))
     si = np.sin(np.radians(angle_deg))
     matrix[0][0] = x * x * (1 - co) + co
-    matrix[1][0] = x * y * (1 - co) - z * si
-    matrix[2][0] = x * z * (1 - co) + y * si
-    matrix[0][1] = x * y * (1 - co) + z * si
+    matrix[1][0] = x * y * (1 - co) + z * si
+    matrix[2][0] = x * z * (1 - co) - y * si
+    matrix[0][1] = x * y * (1 - co) - z * si
     matrix[1][1] = y * y * (1 - co) + co
-    matrix[2][1] = y * z * (1 - co) - x * si
-    matrix[0][2] = x * z * (1 - co) - y * si
-    matrix[1][2] = y * z * (1 - co) + x * si
+    matrix[2][1] = y * z * (1 - co) + x * si
+    matrix[0][2] = x * z * (1 - co) + y * si
+    matrix[1][2] = y * z * (1 - co) - x * si
     matrix[2][2] = z * z * (1 - co) + co
 
     return matrix
@@ -262,7 +262,7 @@ def mat4_scaling(x_val: float, y_val: float, z_val: float) -> np.ndarray:
     Returns a 4x4 scaling matrix
     """
 
-    matrix = np.eye(4, dtype=np.float32, order='C')
+    matrix = np.eye(4, dtype=np.float32, order='F')
     matrix[0][0] = x_val
     matrix[1][1] = y_val
     matrix[2][2] = z_val

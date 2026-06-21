@@ -653,7 +653,7 @@ class CuttingPlane(ActorBaseClass):
             sm = mat4_scaling(self.width, self.depth, 1.0)
 
         om = mat4_translation(*self.offsets)
-        self.plane_mat = rm @ tm @ sm @ om
+        self.plane_mat = om @ sm @ tm @ rm
 
     def update_position(self, dist: float) -> None:
         self.dist = dist
@@ -667,7 +667,7 @@ class CuttingPlane(ActorBaseClass):
         else:
             tm = mat4_translation(0.0, 0.0, self.dist)
 
-        self._modelmatrix = self.plane_mat @ tm
+        self._modelmatrix = tm @ self.plane_mat
 
     def draw(self) -> None:
         if self.dist is None:
@@ -719,7 +719,7 @@ class MeshModel(ActorBaseClass):
         tc = mat4_translation(*model.centeroffset)
         sm = mat4_scaling(*model.scale)
 
-        self._modelmatrix = sm @ tc @ rm @ tm
+        self._modelmatrix = tm @ rm @ tc @ sm
 
     def _initialise_data(self) -> None:
         # Create the vertex and normal arrays.
@@ -820,7 +820,7 @@ class Model(ActorBaseClass):
         tc = mat4_translation(*model.centeroffset)
         sm = mat4_scaling(*model.scale)
 
-        self._modelmatrix = sm @ tc @ rm @ tm
+        self._modelmatrix = tm @ rm @ tc @ sm
 
     def _calculate_bounding_box(self) -> BoundingBox:
         """

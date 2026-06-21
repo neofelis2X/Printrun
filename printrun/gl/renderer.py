@@ -274,14 +274,6 @@ def load_uniform(shader_id: int, uniform_name: str, data):
         glUniform1f(location, data)
     elif uniform_name == "u_oColor":
         glUniform4f(location, *data)
-    elif uniform_name == "viewPos":
-        glUniform3f(location, *data.data)  # FIXME: looks strange
-    elif uniform_name == "u_NormalMat":
-        ptr = data.ctypes.data_as(ctypes.POINTER(GLfloat))
-        glUniformMatrix3fv(location, 1, GL_FALSE, ptr)
-    elif uniform_name == "modelMat":
-        ptr = data.ctypes.data_as(ctypes.POINTER(GLfloat))
-        glUniformMatrix4fv(location, 1, GL_FALSE, ptr)
 
 #### UNIFORM BUFFER OJECTS ####
 # STD140 padding rules
