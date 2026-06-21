@@ -270,14 +270,6 @@ def load_uniform(shader_id, uniform_name: str, data):
         glUniform1f(location, data)
     elif uniform_name == "u_oColor":
         glUniform4f(location, *data)
-    elif uniform_name == "viewPos":
-        glUniform3f(location, *data.data)  # FIXME: looks strange
-    elif uniform_name == "u_NormalMat":
-        ptr = data.ctypes.data_as(ctypes.POINTER(GLfloat))
-        glUniformMatrix3fv(location, 1, GL_FALSE, ptr)
-    elif uniform_name == "modelMat":
-        ptr = data.ctypes.data_as(ctypes.POINTER(GLfloat))
-        glUniformMatrix4fv(location, 1, GL_FALSE, ptr)
 
 #### UNIFORM BUFFER OJECTS ####
 # STD140 padding rules
@@ -325,7 +317,7 @@ class UniformBuffer:
         glBindBuffer(GL_UNIFORM_BUFFER, 0)
 
     @staticmethod
-    def _set_mat(field, mat: np.ndarray, order: np._OrderKACF ='F'):
+    def _set_mat(field, mat: np.ndarray, order: np._OrderKACF = 'F'):
         flat = mat.flatten(order=order).astype(np.float32, copy=False)
         assert flat.nbytes == ctypes.sizeof(field), \
         f"UBO field size {ctypes.sizeof(field)} != data {flat.nbytes}"
@@ -333,8 +325,8 @@ class UniformBuffer:
         ctypes.memmove(field, flat.ctypes.data, flat.nbytes)
 
     def update_view(self, camera):
-        mat = camera.projection @ camera.view
-        self._set_mat(self.data.ViewProjection, mat)
+        vp_mat = camera.projection @ camera.view
+        self._set_mat(self.data.ViewProjection, vp_mat)
         self.data.ViewPos[:3] = camera.eye[:3]
         self._upload_field("ViewProjection")
         self._upload_field("ViewPos")
@@ -346,15 +338,11 @@ class UniformBuffer:
         self._upload_field("ViewportSize")
 
     def update_transform(self, transform_mat):
-        # Model matrices use row-vector convention (translation in the
-        # last row), so a row-major (C) upload yields the column-major
-        # layout OpenGL expects. Camera matrices use the opposite
-        # convention and are uploaded order='F'.
-        self._set_mat(self.data.Transform, transform_mat, order='C')
+        self._set_mat(self.data.Transform, transform_mat)
         nm = get_normal_mat(transform_mat)  # 3x3
-        # std140 mat3: each column padded to vec4, 3x4
-        nm_padded = np.pad(nm.T, ((0, 0), (0, 1)), mode="constant")
-        self._set_mat(self.data.NormalTransform, nm_padded, order='C')
+        # std140 mat3: each column padded to vec4, 4x3
+        nm_padded = np.pad(nm, ((0, 1), (0, 0)), mode="constant")
+        self._set_mat(self.data.NormalTransform, nm_padded)
         self._upload_field("Transform")
         self._upload_field("NormalTransform")
 
