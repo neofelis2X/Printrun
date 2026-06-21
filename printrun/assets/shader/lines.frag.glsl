@@ -4,7 +4,7 @@ layout(std140) uniform General {
     mat4 ViewProjection;
     mat4 Ortho2dProjection;
     vec3 ViewPos;
-    vec3 ViewportSize;
+    vec3 ViewportSize; // width, height, scale
     mat4 Transform;
     mat3 NormalTransform;
 };
@@ -18,9 +18,6 @@ in vec3 vertPos;
 
 uniform int u_isDashed;
 
-float dashSize = 5.0 * ViewportSize.p;
-float gapSize = 4.0 * ViewportSize.p;
-
 out vec4 FragColor;
 
 void main()
@@ -28,6 +25,9 @@ void main()
     if (u_isDashed == 0) {
         FragColor = fs_in.fColor;
     } else {
+        float dashSize = 5.0 * ViewportSize.p;
+        float gapSize = 4.0 * ViewportSize.p;
+
         vec2 dir = (vertPos.xy - startPos.xy) * ViewportSize.xy / 2.0;
         float dist = length(dir);
 

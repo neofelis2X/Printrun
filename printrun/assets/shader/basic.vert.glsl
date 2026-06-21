@@ -22,8 +22,9 @@ out VertexData {
 } vs_out;
 
 void main() {
-    gl_Position = ViewProjection * Transform * vec4(vPos.xyz, 1.0);
+    vec4 worldPos = Transform * vec4(vPos, 1.0);
+    gl_Position = ViewProjection * worldPos;
     vs_out.fColor = (u_OverwriteColor == 1) ? u_oColor : vColor;
-    vs_out.fPos = vec3(Transform * vec4(vPos, 1.0));
+    vs_out.fPos = worldPos.xyz;
     vs_out.fNormal = normalize(NormalTransform * vNormal);
 }
