@@ -46,6 +46,9 @@ from printrun import stltool
 from printrun import gcoder
 Build_Dims = Tuple[int, int, int, int, int, int]
 
+# Line thickness constants
+CUTTING_PLANE_LINE_THICKNESS = 1.0  # cutting-plane outline
+ACTIVE_LAYER_LINE_THICKNESS = 1.2  # active g-code layer
 
 def triangulate_rectangle(i1: int, i2: int, i3: int, i4: int) -> List[int]:
     return [i1, i4, i3, i3, i2, i1]
@@ -683,7 +686,7 @@ class CuttingPlane(ActorBaseClass):
         # Draw the outline on the plane
         self.shaderlist["thicklines"].use()
         renderer.load_uniform(self.shaderlist["thicklines"].id,
-                              "u_Thickness", 1.5)
+                              "u_Thickness", CUTTING_PLANE_LINE_THICKNESS)
         glDrawElements(GL_LINES, 8, GL_UNSIGNED_INT, 6 * sizeof(GLuint))
         glBindVertexArray(0)
         glEnable(GL_CULL_FACE)
@@ -1762,7 +1765,7 @@ class GcodeModelLight(Model):
             self.shaderlist["thicklines"].use()
             sid = self.shaderlist["thicklines"].id
 
-            renderer.load_uniform(sid, "u_Thickness", 2.0)
+            renderer.load_uniform(sid, "u_Thickness", ACTIVE_LAYER_LINE_THICKNESS)
             renderer.load_uniform(sid, "u_OverwriteColor", True)
             renderer.load_uniform(sid, "u_oColor",
                                   self.color_current_printed)
