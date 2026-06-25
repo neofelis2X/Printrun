@@ -91,6 +91,11 @@ class StlViewPanel(wxGLPanel):
         self.camera.view_matrix_initialized = False
         super().OnReshape()
 
+    def setup_materials(self) -> None:
+        '''load material attributes into the uniform buffer'''
+        spec_color = np.array((0.5, 0.5, 0.5), dtype=np.float32)
+        self.ubo.update_material_specular(spec_color, 120.0)
+
     def forceresize(self) -> None:
         #print('forceresize')
         x, y = self.GetClientSize()

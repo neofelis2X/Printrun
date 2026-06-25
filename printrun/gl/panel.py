@@ -258,7 +258,12 @@ class wxGLPanel(BASE_CLASS):
         glEnable(GL_LINE_SMOOTH)
         glEnable(GL_MULTISAMPLE)
 
+        # create and update uniform buffer
         self.ubo.create_ubo()
+        self.setup_materials()
+        self.setup_lights()
+
+        # compile all shader
         shader = renderer.load_shader()
         if not shader:
             logging.error("GL: Loading OpenGL shader failed.")
@@ -369,9 +374,19 @@ class wxGLPanel(BASE_CLASS):
             self.frametime.end_frame()
             self.frametime_counter.SetLabel(self.frametime.get())
 
+    def setup_lights(self) -> None:
+        '''load the lights in the scene into the uniform buffer'''
+        # Light(vec3(1300.0f, 200.0f, 1100.0f), vec3(0.12f), vec3(0.4f), vec3(1.0f)),
+        # Light(vec3(-1200.0f, 1400.0f, 1100.0f), vec3(0.12f), vec3(0.5f), vec3(1.0f)),
+        # Light(vec3(-1000.0f, -900.0f, 1100.0f), vec3(0.12f), vec3(0.3f), vec3(1.0f))
+
     # ==========================================================================
     # To be implemented by a sub class
     # ==========================================================================
+    def setup_materials(self) -> None:
+        '''load material attributes into the uniform buffer'''
+        pass
+
     def create_objects(self) -> None:
         '''create opengl objects when opengl is initialized'''
         pass

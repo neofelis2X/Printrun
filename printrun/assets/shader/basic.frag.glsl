@@ -7,6 +7,8 @@ layout(std140) uniform General {
     vec3 ViewportSize;
     mat4 Transform;
     mat3 NormalTransform;
+    vec3 SpecularColor;
+    float SpecularValue;
 };
 
 in VertexData {
@@ -17,20 +19,12 @@ in VertexData {
 
 out vec4 FragColor;
 
-struct Material {
-    vec3 albedo;
-    vec3 specular;
-    float shininess;
-};
-
 struct Light {
     vec3 position;
     vec3 ambient;
     vec3 diffuse;
     vec3 specular;
 };
-
-Material material = Material(fs_in.fColor.rgb, vec3(0.4f), 80.0f);
 
 const uint NUM_LIGHTS = 3u;
 const Light light[NUM_LIGHTS] = Light[](
@@ -58,14 +52,14 @@ void main() {
 
         // Specular Light
         vec3 halfway = normalize(lightDirection + viewDirection);
-        float spec = pow(max(dot(normal, halfway), 0.0), material.shininess);
+        float spec = pow(max(dot(normal, halfway), 0.0), SpecularValue);
         spec *= step(0.0, faceToLightDirection);
         specularSum += light[i].specular * spec;
     }
 
-    vec3 base_shading = clamp((ambientSum + diffuseSum) * material.albedo, 0.0, 1.0);
+    vec3 base_shading = clamp((ambientSum + diffuseSum) * fs_in.fColor.rgb, 0.0, 1.0);
     vec3 specular_mapped = specularSum / (specularSum + 1.0);
-    specular_mapped *= material.specular;
+    specular_mapped *= SpecularColor;
     vec3 result = min(base_shading + specular_mapped, 1.0);
 
     if (!gl_FrontFacing) {
