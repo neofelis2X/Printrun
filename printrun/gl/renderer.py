@@ -26,14 +26,14 @@ from pyglet.gl import GLfloat, GLuint, GLintptr, GLsizeiptr, \
                       glGenVertexArrays, glBindVertexArray, glGenBuffers, \
                       glBindBuffer, glBufferData, glEnableVertexAttribArray, \
                       glVertexAttribPointer, glGetUniformLocation, \
-                      glUniformMatrix4fv, glUniform1i, glUniform1f, glUniform4f, \
-                      glUniform3f, glGetUniformBlockIndex, glBindBufferRange, \
-                      glUniformBlockBinding, glBufferSubData, glUniformMatrix3fv, \
+                      glUniform1i, glUniform1f, glUniform4f, \
+                      glGetUniformBlockIndex, glBindBufferRange, \
+                      glUniformBlockBinding, glBufferSubData, \
                       glMapBufferRange, glUnmapBuffer, glDeleteBuffers, \
                       glDeleteVertexArrays
 
 # for type hints
-from typing import Optional, Dict
+from typing import Optional, Dict, Tuple
 
 SRC_SHADER_DIR = Path("printrun/assets/shader/")
 
@@ -158,15 +158,15 @@ def get_normal_mat(model_mat: np.ndarray) -> np.ndarray:
 def interleave_vertex_data(verts, color, normal: Optional[np.ndarray]=None,
                            distinct_colors=False, distinct_normals=False):
     if isinstance(normal, np.ndarray) or normal:
-        element_count = 3 + 4 + 3
+        N_ELEMENTS = 3 + 4 + 3
     else:
-        element_count = 3 + 4
+        N_ELEMENTS = 3 + 4
 
-    buffersize = len(verts) * element_count
+    buffersize = len(verts) * N_ELEMENTS
     data = np.zeros(buffersize, dtype=GLfloat)
 
     for i, vertex in enumerate(verts):
-        iv = i * element_count
+        iv = i * N_ELEMENTS
         data[iv:iv + 3] = vertex
         if distinct_colors:
             data[iv + 3:iv + 7] = color[i]
@@ -185,6 +185,12 @@ def create_buffers(create_ebo=True, lines_only=False):
     Creates and sets up VAO, VBO and EBO.
     Returns handles to VAO, VBO, EBO.
     """
+    BYTESIZE = ctypes.sizeof(GLfloat)
+    N_VERT = 3
+    N_COLOR = 4
+    N_NORM = 3
+    N_ELEMENTS = (N_VERT + N_COLOR) if lines_only else (N_VERT + N_COLOR + N_NORM)
+
     # Vertex array object
     vao = GLuint(0)
     glGenVertexArrays(1, vao)
@@ -195,20 +201,18 @@ def create_buffers(create_ebo=True, lines_only=False):
     glGenBuffers(1, vbo)
     glBindBuffer(GL_ARRAY_BUFFER, vbo)
 
-    oc = 7 if lines_only else 10
-
     glEnableVertexAttribArray(0)  # Vertex position
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE,
-                          oc * ctypes.sizeof(GLfloat), 0)
+    glVertexAttribPointer(0, N_VERT, GL_FLOAT, GL_FALSE,
+                          N_ELEMENTS * BYTESIZE, 0)
     glEnableVertexAttribArray(1)  # Vertex colour
-    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE,
-                          oc * ctypes.sizeof(GLfloat),
-                          3 * ctypes.sizeof(GLfloat))
+    glVertexAttribPointer(1, N_COLOR, GL_FLOAT, GL_FALSE,
+                          N_ELEMENTS * BYTESIZE,
+                          N_VERT * BYTESIZE)
     if not lines_only:
         glEnableVertexAttribArray(2)  # Vertex normal direction
-        glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE,
-                              oc * ctypes.sizeof(GLfloat),
-                              7 * ctypes.sizeof(GLfloat))
+        glVertexAttribPointer(2, N_NORM, GL_FLOAT, GL_FALSE,
+                              N_ELEMENTS * BYTESIZE,
+                              (N_VERT + N_COLOR) * BYTESIZE)
 
     if create_ebo:
         # Index buffer object
@@ -258,7 +262,7 @@ def get_gl_array(pylist):
 
 
 ### UNIFORMS ####
-def load_uniform(shader_id, uniform_name: str, data):
+def load_uniform(shader_id: int, uniform_name: str, data):
     location = glGetUniformLocation(shader_id, uniform_name.encode())
     if location == -1:
         logging.warning("GL: Could not find Uniform location: %s" % uniform_name)
@@ -317,7 +321,7 @@ class UniformBuffer:
         glBindBuffer(GL_UNIFORM_BUFFER, 0)
 
     @staticmethod
-    def _set_mat(field, mat: np.ndarray, order: np._OrderKACF = 'F'):
+    def _store_mat(field, mat: np.ndarray, order: np._OrderKACF = 'F'):
         flat = mat.flatten(order=order).astype(np.float32, copy=False)
         assert flat.nbytes == ctypes.sizeof(field), \
         f"UBO field size {ctypes.sizeof(field)} != data {flat.nbytes}"
@@ -326,23 +330,23 @@ class UniformBuffer:
 
     def update_view(self, camera):
         vp_mat = camera.projection @ camera.view
-        self._set_mat(self.data.ViewProjection, vp_mat)
+        self._store_mat(self.data.ViewProjection, vp_mat)
         self.data.ViewPos[:3] = camera.eye[:3]
         self._upload_field("ViewProjection")
         self._upload_field("ViewPos")
 
-    def update_viewport(self, camera, viewport):
-        self._set_mat(self.data.Ortho2dProjection, camera.projection2d)
+    def update_viewport(self, camera, viewport: Tuple[float, float, float]):
+        self._store_mat(self.data.Ortho2dProjection, camera.projection2d)
         self.data.ViewportSize[:3] = viewport[:3]
         self._upload_field("Ortho2dProjection")
         self._upload_field("ViewportSize")
 
-    def update_transform(self, transform_mat):
-        self._set_mat(self.data.Transform, transform_mat)
+    def update_transform(self, transform_mat: np.ndarray):
+        self._store_mat(self.data.Transform, transform_mat)
         nm = get_normal_mat(transform_mat)  # 3x3
         # std140 mat3: each column padded to vec4, 4x3
         nm_padded = np.pad(nm, ((0, 1), (0, 0)), mode="constant")
-        self._set_mat(self.data.NormalTransform, nm_padded)
+        self._store_mat(self.data.NormalTransform, nm_padded)
         self._upload_field("Transform")
         self._upload_field("NormalTransform")
 
