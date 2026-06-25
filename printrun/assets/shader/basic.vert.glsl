@@ -10,6 +10,8 @@ layout(std140) uniform General {
     vec3 ViewportSize;
     mat4 Transform;
     mat3 NormalTransform;
+    vec3 SpecularColor;
+    float SpecularValue;
 };
 
 uniform int u_OverwriteColor;

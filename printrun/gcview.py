@@ -19,6 +19,7 @@ import sys
 import logging
 from pathlib import Path
 import wx
+import numpy as np
 
 from . import gcoder
 from .gl.panel import wxGLPanel
@@ -114,6 +115,11 @@ class GcodeViewPanel(wxGLPanel):
             self.parent.autoplate()
             getattr(self.parent, 'loadcb', bool)()
             self.parent.filenames = None
+
+    def setup_materials(self) -> None:
+        '''load material attributes into the uniform buffer'''
+        spec_color = np.array((0.4, 0.4, 0.4), dtype=np.float32)
+        self.ubo.update_material_specular(spec_color, 80.0)
 
     def create_objects(self) -> None:
         '''create opengl objects when opengl is initialized'''

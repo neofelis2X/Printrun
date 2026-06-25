@@ -276,11 +276,20 @@ def load_uniform(shader_id: int, uniform_name: str, data):
         glUniform4f(location, *data)
 
 #### UNIFORM BUFFER OJECTS ####
-# STD140 padding rules
+# STD140 padding rules, p - padded
+vec3 = GLfloat * 3
 vec3p = GLfloat * (3 + 1)
-vec4p = GLfloat * 4
-mat3p = vec4p * 3
-mat4p = vec4p * 4
+vec4 = GLfloat * 4
+mat3p = vec4 * 3
+mat4p = vec4 * 4
+
+class DirectionalLightStruct(ctypes.Structure):
+    _fields_ = [
+            ("Position", vec3p),
+            ("Ambient", vec3p),
+            ("Diffuse", vec3p),
+            ("Specular", vec3p)
+            ]
 
 class GeneralUBOStruct(ctypes.Structure):
     _fields_ = [
@@ -289,7 +298,9 @@ class GeneralUBOStruct(ctypes.Structure):
             ("ViewPos", vec3p),
             ("ViewportSize", vec3p),
             ("Transform", mat4p),
-            ("NormalTransform", mat3p)
+            ("NormalTransform", mat3p),
+            ("SpecularColor", vec3),
+            ("SpecularValue", GLfloat)
             ]
 
 class UniformBuffer:
@@ -349,6 +360,12 @@ class UniformBuffer:
         self._store_mat(self.data.NormalTransform, nm_padded)
         self._upload_field("Transform")
         self._upload_field("NormalTransform")
+
+    def update_material_specular(self, spec_color: np.ndarray, shininess: float):
+        self.data.SpecularColor[:3] = spec_color[:3]
+        self.data.SpecularValue = shininess
+        self._upload_field("SpecularColor")
+        self._upload_field("SpecularValue")
 
 def bind_shader_ublock(shaderlist, ublock_name: str) -> None:
     ublock_index = GLuint(0)
