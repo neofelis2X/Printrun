@@ -23,6 +23,7 @@ from pyglet.gl import GLfloat, GLuint, GLintptr, GLsizeiptr, \
                       GL_ELEMENT_ARRAY_BUFFER, GL_FLOAT, GL_ARRAY_BUFFER, \
                       GL_STATIC_DRAW, GL_FALSE, GL_UNIFORM_BUFFER, \
                       GL_DYNAMIC_DRAW, GL_MAP_WRITE_BIT, GL_MAP_READ_BIT, \
+                      GL_UNIFORM_OFFSET, GL_INVALID_INDEX, \
                       glGenVertexArrays, glBindVertexArray, glGenBuffers, \
                       glBindBuffer, glBufferData, glEnableVertexAttribArray, \
                       glVertexAttribPointer, glGetUniformLocation, \
@@ -30,10 +31,11 @@ from pyglet.gl import GLfloat, GLuint, GLintptr, GLsizeiptr, \
                       glGetUniformBlockIndex, glBindBufferRange, \
                       glUniformBlockBinding, glBufferSubData, \
                       glMapBufferRange, glUnmapBuffer, glDeleteBuffers, \
-                      glDeleteVertexArrays
+                      glDeleteVertexArrays, glGetUniformIndices, \
+                      glGetActiveUniformsiv
 
 # for type hints
-from typing import Optional, Dict, Tuple
+from typing import Optional, Dict, Tuple, Literal
 
 SRC_SHADER_DIR = Path("printrun/assets/shader/")
 
@@ -283,6 +285,8 @@ vec4 = GLfloat * 4
 mat3p = vec4 * 3
 mat4p = vec4 * 4
 
+MAX_LIGHTS = 4
+
 class DirectionalLightStruct(ctypes.Structure):
     _fields_ = [
             ("Position", vec3p),
@@ -300,8 +304,19 @@ class GeneralUBOStruct(ctypes.Structure):
             ("Transform", mat4p),
             ("NormalTransform", mat3p),
             ("SpecularColor", vec3),
-            ("SpecularValue", GLfloat)
+            ("SpecularValue", GLfloat),
+            ("NumLights", GLuint),
+            ("_padding", GLuint * 3),
+            ("Lights", DirectionalLightStruct * MAX_LIGHTS)
             ]
+
+def make_light(position, ambient, diffuse, specular) -> DirectionalLightStruct:
+    light = DirectionalLightStruct()
+    light.Position[:3] = position
+    light.Ambient[:3]  = ambient
+    light.Diffuse[:3]  = diffuse
+    light.Specular[:3] = specular
+    return light
 
 class UniformBuffer:
     def __init__(self):
@@ -332,7 +347,7 @@ class UniformBuffer:
         glBindBuffer(GL_UNIFORM_BUFFER, 0)
 
     @staticmethod
-    def _store_mat(field, mat: np.ndarray, order: np._OrderKACF = 'F'):
+    def _store_mat(field, mat: np.ndarray, order: Literal['C', 'F'] = 'F'):
         flat = mat.flatten(order=order).astype(np.float32, copy=False)
         assert flat.nbytes == ctypes.sizeof(field), \
         f"UBO field size {ctypes.sizeof(field)} != data {flat.nbytes}"
@@ -367,6 +382,13 @@ class UniformBuffer:
         self._upload_field("SpecularColor")
         self._upload_field("SpecularValue")
 
+    def update_lights(self, lights):
+        self.data.NumLights = len(lights)
+        for i, light in enumerate(lights):
+            self.data.Lights[i] = light
+        self._upload_field("NumLights")
+        self._upload_field("Lights")
+
 def bind_shader_ublock(shaderlist, ublock_name: str) -> None:
     ublock_index = GLuint(0)
     binding_point = 0
@@ -374,4 +396,53 @@ def bind_shader_ublock(shaderlist, ublock_name: str) -> None:
     for sh in shaderlist.values():
         ublock_index = glGetUniformBlockIndex(sh.id, byte_name)
         glUniformBlockBinding(sh.id, ublock_index, binding_point)
+
+def validate_ubo_layout(shader_id: int, structure: ctypes.Structure,
+                        member_names: Dict[str, str]) -> bool:
+    """
+    Compare the driver's std140 offsets of an uniform block against a
+    ctypes.Structure. `names` maps the ubo uniform name to the ctypes field name.
+    Returns True if every offset matches, logs each mismatch otherwise.
+
+    Example members for an array element:
+        {"SpecularValue":  "SpecularValue",
+         "lights[0].position": "Lights"}
+    """
+    gl_names = list(member_names.keys())
+    n_names = len(gl_names)
+
+    # Get uniform indices of the specified uniform names from the driver
+    name_array = (ctypes.c_char_p * n_names)(*[name.encode("utf-8") for name in gl_names])
+    names_ptr = ctypes.cast(name_array,
+                            ctypes.POINTER(ctypes.POINTER(ctypes.c_char)))
+    indices = (GLuint * n_names)()
+    glGetUniformIndices(shader_id, n_names, names_ptr, indices)
+
+    # Request byte offsets in the block from the driver
+    offsets = (ctypes.c_int * n_names)()
+    glGetActiveUniformsiv(shader_id, n_names, indices,
+                          GL_UNIFORM_OFFSET, offsets)
+
+    # Validate gl offsets against ctypes offsets
+    validation = True
+    for i, gl_name in enumerate(gl_names):
+        if indices[i] == GL_INVALID_INDEX:
+            logging.error("GL: UBO member '%s' not found (optimised out?)",
+                          gl_name)
+            validation = False
+            continue
+
+        driver_offset = offsets[i]
+        field_name = member_names[gl_name]
+        ctypes_offset = getattr(structure, field_name).offset
+
+        if driver_offset != ctypes_offset:
+            logging.error("GL: std140 offset mismatch for '%s': "
+                          "driver=%d, ctypes=%d",
+                          gl_name, driver_offset, ctypes_offset)
+            validation = False
+        else:
+            logging.debug("GL: '%s' offset OK (%d)", gl_name, driver_offset)
+
+    return validation
 

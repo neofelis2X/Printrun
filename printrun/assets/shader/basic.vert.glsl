@@ -3,6 +3,15 @@ layout(location = 0) in vec3 vPos;
 layout(location = 1) in vec4 vColor;
 layout(location = 2) in vec3 vNormal;
 
+const uint MAX_LIGHTS = 4u;
+
+struct Light {
+    vec3 position;
+    vec3 ambient;
+    vec3 diffuse;
+    vec3 specular;
+};
+
 layout(std140) uniform General {
     mat4 ViewProjection;
     mat4 Ortho2dProjection;
@@ -12,6 +21,8 @@ layout(std140) uniform General {
     mat3 NormalTransform;
     vec3 SpecularColor;
     float SpecularValue;
+    uint NumLights;
+    Light lights[MAX_LIGHTS];
 };
 
 uniform int u_OverwriteColor;
