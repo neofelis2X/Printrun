@@ -272,6 +272,17 @@ class wxGLPanel(BASE_CLASS):
 
         self.shader = shader
         renderer.bind_shader_ublock(self.shader, "General")
+
+        checks = {
+            "SpecularColor": "SpecularColor",  # vec3+float packing
+            "NumLights": "NumLights",
+            "lights[0].position": "Lights",  # lights array start (offset 304)
+        }
+
+        if not renderer.validate_ubo_layout(shader["basic"].id,
+                                            renderer.GeneralUBOStruct, checks):
+            logging.error("GL: UBO layout validation failed. Visual shading errors will occur.")
+
         self.focus.load(self.shader, self.ubo)
         self.platform.load(self.shader, self.ubo)
 
@@ -376,9 +387,12 @@ class wxGLPanel(BASE_CLASS):
 
     def setup_lights(self) -> None:
         '''load the lights in the scene into the uniform buffer'''
-        # Light(vec3(1300.0f, 200.0f, 1100.0f), vec3(0.12f), vec3(0.4f), vec3(1.0f)),
-        # Light(vec3(-1200.0f, 1400.0f, 1100.0f), vec3(0.12f), vec3(0.5f), vec3(1.0f)),
-        # Light(vec3(-1000.0f, -900.0f, 1100.0f), vec3(0.12f), vec3(0.3f), vec3(1.0f))
+        lights = [
+            renderer.make_light((1300.0,  200.0, 1100.0), (0.12,) * 3, (0.4,) * 3, (1.0,) * 3),
+            renderer.make_light((-1200.0, 1400.0, 1100.0), (0.12,) * 3, (0.5,) * 3, (1.0,) * 3),
+            renderer.make_light((-1000.0, -900.0, 1100.0), (0.12,) * 3, (0.3,) * 3, (1.0,) * 3),
+        ]
+        self.ubo.update_lights(lights)
 
     # ==========================================================================
     # To be implemented by a sub class

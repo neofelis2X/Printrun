@@ -1,5 +1,14 @@
 #version 330 core
 
+const uint MAX_LIGHTS = 4u;
+
+struct Light {
+    vec3 position;
+    vec3 ambient;
+    vec3 diffuse;
+    vec3 specular;
+};
+
 layout(std140) uniform General {
     mat4 ViewProjection;
     mat4 Ortho2dProjection;
@@ -9,6 +18,8 @@ layout(std140) uniform General {
     mat3 NormalTransform;
     vec3 SpecularColor;
     float SpecularValue;
+    uint NumLights;
+    Light lights[MAX_LIGHTS];
 };
 
 in VertexData {
@@ -19,20 +30,6 @@ in VertexData {
 
 out vec4 FragColor;
 
-struct Light {
-    vec3 position;
-    vec3 ambient;
-    vec3 diffuse;
-    vec3 specular;
-};
-
-const uint NUM_LIGHTS = 3u;
-const Light light[NUM_LIGHTS] = Light[](
-        Light(vec3(1300.0f, 200.0f, 1100.0f), vec3(0.12f), vec3(0.4f), vec3(1.0f)),
-        Light(vec3(-1200.0f, 1400.0f, 1100.0f), vec3(0.12f), vec3(0.5f), vec3(1.0f)),
-        Light(vec3(-1000.0f, -900.0f, 1100.0f), vec3(0.12f), vec3(0.3f), vec3(1.0f))
-    );
-
 void main() {
     vec3 viewDirection = normalize(ViewPos - fs_in.fPos);
     vec3 normal = normalize(fs_in.fNormal);
@@ -40,21 +37,21 @@ void main() {
     vec3 diffuseSum = vec3(0.0);
     vec3 specularSum = vec3(0.0);
 
-    for (uint i = 0u; i < NUM_LIGHTS; i++) {
+    for (uint i = 0u; i < NumLights; i++) {
         // Ambient Light
-        ambientSum += light[i].ambient;
+        ambientSum += lights[i].ambient;
 
         // Diffuse Light
-        vec3 lightDirection = normalize(light[i].position - fs_in.fPos);
+        vec3 lightDirection = normalize(lights[i].position - fs_in.fPos);
         float faceToLightDirection = dot(normal, lightDirection);
         float diff = max(faceToLightDirection, 0.0);
-        diffuseSum += light[i].diffuse * diff;
+        diffuseSum += lights[i].diffuse * diff;
 
         // Specular Light
         vec3 halfway = normalize(lightDirection + viewDirection);
         float spec = pow(max(dot(normal, halfway), 0.0), SpecularValue);
         spec *= step(0.0, faceToLightDirection);
-        specularSum += light[i].specular * spec;
+        specularSum += lights[i].specular * spec;
     }
 
     vec3 base_shading = clamp((ambientSum + diffuseSum) * fs_in.fColor.rgb, 0.0, 1.0);
