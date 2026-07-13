@@ -11,8 +11,8 @@ struct Light {
 
 layout(std140) uniform General {
     mat4 ViewProjection;
-    mat4 Ortho2dProjection;
     vec3 ViewPos;
+    mat4 Ortho2dProjection;
     vec3 ViewportSize;
     mat4 Transform;
     mat3 NormalTransform;

@@ -298,8 +298,8 @@ class DirectionalLightStruct(ctypes.Structure):
 class GeneralUBOStruct(ctypes.Structure):
     _fields_ = [
             ("ViewProjection", mat4p),
-            ("Ortho2dProjection", mat4p),
             ("ViewPos", vec3p),
+            ("Ortho2dProjection", mat4p),
             ("ViewportSize", vec3p),
             ("Transform", mat4p),
             ("NormalTransform", mat3p),
@@ -370,14 +370,12 @@ class UniformBuffer:
         vp_mat = camera.projection @ camera.view
         self._store_mat(self.data.ViewProjection, vp_mat)
         self.data.ViewPos[:3] = camera.eye[:3]
-        self._upload_field("ViewProjection")
-        self._upload_field("ViewPos")
+        self._upload_range("ViewProjection", "ViewPos")
 
     def update_viewport(self, camera, viewport: Tuple[float, float, float]):
         self._store_mat(self.data.Ortho2dProjection, camera.projection2d)
         self.data.ViewportSize[:3] = viewport[:3]
-        self._upload_field("Ortho2dProjection")
-        self._upload_field("ViewportSize")
+        self._upload_range("Ortho2dProjection", "ViewportSize")
 
     def update_transform(self, transform_mat: np.ndarray):
         self._store_mat(self.data.Transform, transform_mat)
