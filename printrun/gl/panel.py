@@ -388,9 +388,9 @@ class wxGLPanel(BASE_CLASS):
     def setup_lights(self) -> None:
         '''load the lights in the scene into the uniform buffer'''
         lights = [
-            renderer.make_light((1300.0,  200.0, 1100.0), (0.12,) * 3, (0.4,) * 3, (1.0,) * 3),
-            renderer.make_light((-1200.0, 1400.0, 1100.0), (0.12,) * 3, (0.5,) * 3, (1.0,) * 3),
-            renderer.make_light((-1000.0, -900.0, 1100.0), (0.12,) * 3, (0.3,) * 3, (1.0,) * 3),
+            renderer.create_light((1300.0,  200.0, 1100.0), (0.12,) * 3, (0.4,) * 3, (1.0,) * 3),
+            renderer.create_light((-1200.0, 1400.0, 1100.0), (0.12,) * 3, (0.5,) * 3, (1.0,) * 3),
+            renderer.create_light((-1000.0, -900.0, 1100.0), (0.12,) * 3, (0.3,) * 3, (1.0,) * 3),
         ]
         self.ubo.update_lights(lights)
 

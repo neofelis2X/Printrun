@@ -11,8 +11,8 @@ struct Light {
 
 layout(std140) uniform General {
     mat4 ViewProjection;
-    mat4 Ortho2dProjection;
     vec3 ViewPos;
+    mat4 Ortho2dProjection;
     vec3 ViewportSize;
     mat4 Transform;
     mat3 NormalTransform;
@@ -37,7 +37,7 @@ void main() {
     vec3 diffuseSum = vec3(0.0);
     vec3 specularSum = vec3(0.0);
 
-    for (uint i = 0u; i < NumLights; i++) {
+    for (uint i = 0u; i < MAX_LIGHTS; i++) {
         // Ambient Light
         ambientSum += lights[i].ambient;
 
@@ -52,6 +52,10 @@ void main() {
         float spec = pow(max(dot(normal, halfway), 0.0), SpecularValue);
         spec *= step(0.0, faceToLightDirection);
         specularSum += lights[i].specular * spec;
+
+        if (i >= NumLights) {
+            break;
+        }
     }
 
     vec3 base_shading = clamp((ambientSum + diffuseSum) * fs_in.fColor.rgb, 0.0, 1.0);
