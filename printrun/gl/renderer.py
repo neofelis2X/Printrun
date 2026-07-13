@@ -336,14 +336,26 @@ class UniformBuffer:
         glBindBufferRange(GL_UNIFORM_BUFFER, 0, self.ubo, GLintptr(0), GLsizeiptr(ctypes.sizeof(self.data)))
         self.is_initialised = True
 
-    def _upload_field(self, name: str) -> None:
-        """Push a single named field to the GPU."""
-        field = getattr(GeneralUBOStruct, name)
+    def _upload_field(self, field_name: str) -> None:
+        """Push a single uniform to the GPU."""
+        field = getattr(GeneralUBOStruct, field_name)
         glBindBuffer(GL_UNIFORM_BUFFER, self.ubo)
         glBufferSubData(GL_UNIFORM_BUFFER,
                         GLintptr(field.offset),
                         GLsizeiptr(field.size),
                         ctypes.byref(self.data, field.offset))
+        glBindBuffer(GL_UNIFORM_BUFFER, 0)
+
+    def _upload_range(self, first_name: str, last_name: str) -> None:
+        """Push mutiple consecutive uniforms to the GPU."""
+        first_field = getattr(GeneralUBOStruct, first_name)
+        last_field = getattr(GeneralUBOStruct, last_name)
+        size = last_field.offset - first_field.offset + last_field.size
+        glBindBuffer(GL_UNIFORM_BUFFER, self.ubo)
+        glBufferSubData(GL_UNIFORM_BUFFER,
+                        GLintptr(first_field.offset),
+                        GLsizeiptr(size),
+                        ctypes.byref(self.data, first_field.offset))
         glBindBuffer(GL_UNIFORM_BUFFER, 0)
 
     @staticmethod
@@ -373,21 +385,18 @@ class UniformBuffer:
         # std140 mat3: each column padded to vec4, 4x3
         nm_padded = np.pad(nm, ((0, 1), (0, 0)), mode="constant")
         self._store_mat(self.data.NormalTransform, nm_padded)
-        self._upload_field("Transform")
-        self._upload_field("NormalTransform")
+        self._upload_range("Transform", "NormalTransform")
 
     def update_material_specular(self, spec_color: np.ndarray, shininess: float):
         self.data.SpecularColor[:3] = spec_color[:3]
         self.data.SpecularValue = shininess
-        self._upload_field("SpecularColor")
-        self._upload_field("SpecularValue")
+        self._upload_range("SpecularColor", "SpecularValue")
 
     def update_lights(self, lights):
         self.data.NumLights = len(lights)
         for i, light in enumerate(lights):
             self.data.Lights[i] = light
-        self._upload_field("NumLights")
-        self._upload_field("Lights")
+        self._upload_range("NumLights", "Lights")
 
 def bind_shader_ublock(shaderlist, ublock_name: str) -> None:
     ublock_index = GLuint(0)
