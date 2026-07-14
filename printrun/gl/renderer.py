@@ -310,7 +310,7 @@ class GeneralUBOStruct(ctypes.Structure):
             ("Lights", DirectionalLightStruct * MAX_LIGHTS)
             ]
 
-def make_light(position, ambient, diffuse, specular) -> DirectionalLightStruct:
+def create_light(position, ambient, diffuse, specular) -> DirectionalLightStruct:
     light = DirectionalLightStruct()
     light.Position[:3] = position
     light.Ambient[:3]  = ambient
@@ -347,7 +347,7 @@ class UniformBuffer:
         glBindBuffer(GL_UNIFORM_BUFFER, 0)
 
     def _upload_range(self, first_name: str, last_name: str) -> None:
-        """Push mutiple consecutive uniforms to the GPU."""
+        """Push multiple consecutive uniforms to the GPU."""
         first_field = getattr(GeneralUBOStruct, first_name)
         last_field = getattr(GeneralUBOStruct, last_name)
         size = last_field.offset - first_field.offset + last_field.size
@@ -404,18 +404,18 @@ def bind_shader_ublock(shaderlist, ublock_name: str) -> None:
         ublock_index = glGetUniformBlockIndex(sh.id, byte_name)
         glUniformBlockBinding(sh.id, ublock_index, binding_point)
 
-def validate_ubo_layout(shader_id: int, structure: ctypes.Structure,
-                        member_names: Dict[str, str]) -> bool:
+def validate_ubo_layout(shader_id: int, structure: type,
+                        uniform_names: Dict[str, str]) -> bool:
     """
     Compare the driver's std140 offsets of an uniform block against a
-    ctypes.Structure. `names` maps the ubo uniform name to the ctypes field name.
+    ctypes.Structure. `uniform_names` maps the ubo uniform name to the ctypes field name.
     Returns True if every offset matches, logs each mismatch otherwise.
 
     Example members for an array element:
         {"SpecularValue":  "SpecularValue",
          "lights[0].position": "Lights"}
     """
-    gl_names = list(member_names.keys())
+    gl_names = list(uniform_names.keys())
     n_names = len(gl_names)
 
     # Get uniform indices of the specified uniform names from the driver
@@ -426,9 +426,9 @@ def validate_ubo_layout(shader_id: int, structure: ctypes.Structure,
     glGetUniformIndices(shader_id, n_names, names_ptr, indices)
 
     # Request byte offsets in the block from the driver
-    offsets = (ctypes.c_int * n_names)()
+    gl_offsets = (ctypes.c_int * n_names)()
     glGetActiveUniformsiv(shader_id, n_names, indices,
-                          GL_UNIFORM_OFFSET, offsets)
+                          GL_UNIFORM_OFFSET, gl_offsets)
 
     # Validate gl offsets against ctypes offsets
     validation = True
@@ -439,17 +439,17 @@ def validate_ubo_layout(shader_id: int, structure: ctypes.Structure,
             validation = False
             continue
 
-        driver_offset = offsets[i]
-        field_name = member_names[gl_name]
-        ctypes_offset = getattr(structure, field_name).offset
+        gl_offset = gl_offsets[i]
+        field_name = uniform_names[gl_name]
+        ctypes_field = getattr(structure, field_name)
 
-        if driver_offset != ctypes_offset:
-            logging.error("GL: std140 offset mismatch for '%s': "
-                          "driver=%d, ctypes=%d",
-                          gl_name, driver_offset, ctypes_offset)
+        if gl_offset != ctypes_field.offset:
+            logging.error("GL: UBO std140 offset mismatch for '%s': "
+                          "ubo=%d, ctypes=%d",
+                          gl_name, gl_offset, ctypes_field.offset)
             validation = False
         else:
-            logging.debug("GL: '%s' offset OK (%d)", gl_name, driver_offset)
+            logging.debug("GL: '%s' offset OK (%d)", gl_name, gl_offset)
 
     return validation
 
