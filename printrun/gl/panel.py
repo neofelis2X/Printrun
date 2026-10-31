@@ -213,9 +213,8 @@ class wxGLPanel(BASE_CLASS):
 
     def Destroy(self) -> None:
         # clean up the pyglet OpenGL context
-        assert self.pygletcontext is not None
-        self.pygletcontext.destroy()
-        # call the super method
+        if self.pygletcontext:
+            self.pygletcontext.destroy()
         super().Destroy()
 
     def init_frametime(self) -> None:
@@ -237,15 +236,15 @@ class wxGLPanel(BASE_CLASS):
         '''Initialize OpenGL for use in the window.'''
         if self.GLinitialized:
             return
-        self.GLinitialized = True
+
         # create a pyglet context for this panel
         self.pygletcontext = gl.Context(gl.current_context)
         self.pygletcontext.canvas = self
         self.pygletcontext.set_current()
         glinfo = self.pygletcontext.get_info()
-        logging.debug("OpenGL Context Version: %s, Vendor: %s - %s" %
-                      (glinfo.get_version(), glinfo.get_vendor(),
-                       glinfo.get_renderer()))
+        logging.debug("OpenGL Context Version: %s, Vendor: %s - %s",
+                      glinfo.get_version(), glinfo.get_vendor(),
+                      glinfo.get_renderer())
 
         # normal gl init
         glClearColor(*self.color_background)
@@ -273,41 +272,46 @@ class wxGLPanel(BASE_CLASS):
         self.shader = shader
         renderer.bind_shader_ublock(self.shader, "General")
 
-        checks = {
-            "SpecularColor": "SpecularColor",  # vec3+float packing
-            "NumLights": "NumLights",
-            "lights[0].position": "Lights",  # lights array start (offset 304)
-        }
+        if self.debug_features:
+            checks = {
+                "SpecularColor": "SpecularColor",  # vec3+float packing
+                "NumLights": "NumLights",
+                "lights[0].position": "Lights",  # lights array start (offset 304)
+            }
 
-        if not renderer.validate_ubo_layout(shader["basic"].id,
-                                            renderer.GeneralUBOStruct, checks):
-            logging.error("GL: UBO layout validation failed. Visual shading errors will occur.")
+            if not renderer.validate_ubo_layout(shader["basic"].id,
+                                                renderer.GeneralUBOStruct, checks):
+                logging.error("GL: UBO layout validation failed. Visual shading errors will occur.")
 
         self.focus.load(self.shader, self.ubo)
         self.platform.load(self.shader, self.ubo)
+
+        self.GLinitialized = True
 
         if call_reshape:
             self.OnReshape()
 
     def OnReshape(self) -> None:
         """Reshape the OpenGL viewport based on the size of the window"""
+        if not self.GLinitialized:
+            return
+
         self.set_current_context()
         old_width, old_height = self.width, self.height
 
         self.display_ppi_factor = float(self.GetContentScaleFactor())
         new_size = self.GetClientSize() * self.display_ppi_factor
-        width, height = new_size.width, new_size.height
+        new_width, new_height = new_size.width, new_size.height
 
-        if width < 1 or height < 1:
+        if new_width < 1 or new_height < 1:
             return
 
-        self.OnInitGL(call_reshape = False)
-        glViewport(0, 0, width, height)
+        glViewport(0, 0, new_width, new_height)
 
-        self.width = max(float(width), 1.0)
-        self.height = max(float(height), 1.0)
+        self.width = max(float(new_width), 1.0)
+        self.height = max(float(new_height), 1.0)
 
-        self.camera.update_size(width, height, self.display_ppi_factor)
+        self.camera.update_size(new_width, new_height, self.display_ppi_factor)
         self.ubo.update_viewport(self.camera,
                                  (self.width, self.height, self.display_ppi_factor))
         self.focus.update_size()
@@ -366,6 +370,7 @@ class wxGLPanel(BASE_CLASS):
         self.set_current_context()
         if self.camera.has_changed:
             self.ubo.update_view(self.camera)
+            self.camera.changes_consumed()
 
         if self.debug_features:
             self.frametime.start_frame()
@@ -456,7 +461,6 @@ class wxGLPanel(BASE_CLASS):
                 self.camera.handle_rotation(event)
             elif event.RightIsDown():
                 self.camera.handle_translation(event)
-            self.Refresh(False)
 
         elif event.LeftUp() or event.RightUp():
             self.camera.init_rot_pos = None

@@ -143,7 +143,6 @@ class GcodePlaterPanel(PlaterPanel):
         else:
             model = self.s.addfile(gcode)
 
-
         wx.CallAfter(self.Refresh)
 
     def done(self, event, cb):

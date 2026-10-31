@@ -45,7 +45,7 @@ class KeyboardInput():
         self.resetview = reset_fn
         self.reload_shader = shader_fn
 
-        # Optional featuress
+        # Optional features
         self.layer_up = self.dummy_fn
         self.layer_down = self.dummy_fn
         self.current_layer = self.dummy_fn
