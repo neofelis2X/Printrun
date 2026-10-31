@@ -16,17 +16,11 @@
 import math
 import logging
 import numpy as np
-from pyglet import gl
 
 # for type hints
 from typing import List, Tuple, Union, TYPE_CHECKING
-from ctypes import Array
 if TYPE_CHECKING:
     from .camera import Camera
-
-def vec(*args: float) -> Array:
-    '''Returns an array of GLfloat values'''
-    return (gl.GLfloat * len(args))(*args)
 
 def vec_length(vector: np.ndarray) -> float:
     '''Return the length of a given vector'''
@@ -146,7 +140,7 @@ def intersect_ray_plane(ray: Tuple[np.ndarray, np.ndarray],
 
     plane_normal_np = np.array(plane_normal)
     q = ray_dir.dot(plane_normal_np)
-    if q == 0:
+    if abs(q) < 1e-9:
         return None
 
     t = - (ray[0].dot(plane_normal_np) + plane_offset) / q
@@ -278,13 +272,6 @@ def pyg_to_np_mat4(pyg_matrix) -> np.ndarray:
                      pyg_matrix.row(2),
                      pyg_matrix.row(3)), dtype=np.float32)
 
-def np_to_gl_mat(np_matrix: np.ndarray) -> Array:
-    """
-    Converts a numpy matrix into a c_types_Array which
-    can be directly passed into OpenGL calls.
-    """
-    return (gl.GLdouble * np_matrix.size)(*np_matrix.ravel())
-
 def np_unproject(winx: float, winy: float, winz: float,
                  mv_mat: np.ndarray, p_mat: np.ndarray,
                  viewport: Tuple[float, float, float, float]
@@ -309,7 +296,7 @@ def np_unproject(winx: float, winy: float, winz: float,
     try:
         mat_inv = np.linalg.inv(mat_a)
     except np.linalg.LinAlgError:
-        logging.warning(_("GL: np_unproject could calculate inverse of matrix, result will be 0.0."))
+        logging.warning(_("GL: np_unproject could not calculate inverse of matrix, result will be 0.0."))
         return point
 
     # Normalized screen coordinates between -1 and 1

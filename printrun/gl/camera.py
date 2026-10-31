@@ -43,7 +43,6 @@ def debug_info(method):
 
 class Camera():
 
-    LOCK = Lock()
     FOV = 45.0
     MIN_DISTANCE = 3.0  # mm
     MAX_DISTANCE = 1000.0
@@ -51,6 +50,7 @@ class Camera():
     def __init__(self, parent: 'wxGLPanel', build_dimensions: Build_Dims,
                  ortho: bool = True) -> None:
 
+        self.LOCK = Lock()
         self.canvas = parent
         self.is_orthographic = ortho
         self.orbit_control = True
@@ -85,17 +85,14 @@ class Camera():
 
     @property
     def eye(self) -> np.ndarray:
-        self._has_changed = False
         return self._eye.astype(dtype=np.float32)
 
     @property
     def view(self) -> np.ndarray:
-        self._has_changed = False
         return self._view_mat
 
     @property
     def projection(self) -> np.ndarray:
-        self._has_changed = False
         return self._proj_mat
 
     @property
@@ -185,13 +182,16 @@ class Camera():
                                               self.height, -1.0, 1.0)
         self._has_changed = True
 
+    def changes_consumed(self) -> None:
+        self._has_changed = False
+
     # @debug_info
     def fit_to_model(self,
                      bounding_sphere: Tuple[Tuple[float, float, float], float]
                      ) -> None:
         """
         Takes the bounding sphere of a model (center, radius) and zooms / moves
-        the current view so that the view focues on the model.
+        the current view so that the view focuses on the model.
         """
         forward = self._target - self._eye
         uforward = forward / vec_length(forward)
@@ -199,7 +199,7 @@ class Camera():
 
         half_min_fov_rad = 0.5 * np.radians(self.FOV)
         if aspect < 1.0:
-            half_min_fov_rad = np.atan(aspect * np.tan(half_min_fov_rad))
+            half_min_fov_rad = np.arctan(aspect * np.tan(half_min_fov_rad))
 
         distance_to_center = bounding_sphere[1] / np.sin(half_min_fov_rad)
         self._target = np.array(bounding_sphere[0])
@@ -381,7 +381,7 @@ class Camera():
 
     def _current_dolly_factor(self) -> float:
         """
-        Returns a factor of the current dolly distance relativ to
+        Returns a factor of the current dolly distance relative to
         the max. dolly distance.
         """
         forward = self._eye - self._target

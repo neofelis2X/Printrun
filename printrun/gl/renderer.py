@@ -35,9 +35,9 @@ from pyglet.gl import GLfloat, GLuint, GLintptr, GLsizeiptr, \
                       glGetActiveUniformsiv
 
 # for type hints
-from typing import Optional, Dict, Tuple, Literal
+from typing import Optional, Dict, Tuple, List, Literal
 
-SRC_SHADER_DIR = Path("printrun/assets/shader/")
+SRC_SHADER_DIR = Path(__file__).parent.parent / "assets/shader/"
 
 
 class MapBufferRange:
@@ -49,6 +49,7 @@ class MapBufferRange:
         self.target = GL_ELEMENT_ARRAY_BUFFER if index_buffer else GL_ARRAY_BUFFER
         self.access = GL_MAP_READ_BIT if read else GL_MAP_WRITE_BIT
         self.elementtype = GLuint if index_buffer else GLfloat
+        self.is_mapped = False
 
     def __enter__(self) -> Optional[np.ndarray]:
         glBindVertexArray(self.vao)
@@ -65,9 +66,13 @@ class MapBufferRange:
 
         float_ptr = ctypes.cast(buffer_ptr, ctypes.POINTER(self.elementtype))
 
+        self.is_mapped = True
         return np.ctypeslib.as_array(float_ptr, shape=(self.size,))
 
     def __exit__(self, exc_type, exc_value, exc_traceback) -> bool:
+        if not self.is_mapped:
+            return True
+
         result = glUnmapBuffer(self.target)
         glBindVertexArray(0)
         if not result:
@@ -85,7 +90,7 @@ class MapBufferRange:
 def load_shader() -> Optional[Dict[str, shader.ShaderProgram]]:
     if not SRC_SHADER_DIR.is_dir():
         logging.error("GL: Directory containing the \
-        shader is not accessible.\nPath: %s" % SRC_SHADER_DIR.resolve())
+        shader is not accessible.\nPath: %s", SRC_SHADER_DIR.resolve())
         return None
 
     srcs = SRC_SHADER_DIR.glob("*.glsl")
@@ -94,7 +99,10 @@ def load_shader() -> Optional[Dict[str, shader.ShaderProgram]]:
                                                   ".geom": "geometry"}
     shs = {}
     for src in srcs:
-        kind = shader_kinds[src.suffixes[0]]
+        kind = shader_kinds.get(src.suffixes[0], None)
+        if not kind:
+            logging.warning("GL: Found invalid file in shader directory: %s", src.name)
+            continue
         sh = _compile_shader(src, kind)
         if not sh:
             return None
@@ -104,7 +112,7 @@ def load_shader() -> Optional[Dict[str, shader.ShaderProgram]]:
         basic_program = shader.ShaderProgram(shs["basic.vert"],
                                              shs["basic.frag"])
     except shader.ShaderException as e:
-        logging.error("GL: Error creating the 'basic' shader program: %s" % e)
+        logging.error("GL: Error creating the 'basic' shader program: %s", e)
         return None
     logging.debug("GL: Successfully created the 'basic' shader program.")
 
@@ -112,7 +120,7 @@ def load_shader() -> Optional[Dict[str, shader.ShaderProgram]]:
         lines_program = shader.ShaderProgram(shs["lines.vert"],
                                              shs["lines.frag"])
     except shader.ShaderException as e:
-        logging.error("GL: Error creating the 'lines' shader program:%s" % e)
+        logging.error("GL: Error creating the 'lines' shader program: %s", e)
         return None
     logging.debug("GL: Successfully created the 'lines' shader program.")
 
@@ -121,7 +129,7 @@ def load_shader() -> Optional[Dict[str, shader.ShaderProgram]]:
                                              shs["thicklines.geom"],
                                              shs["thicklines.frag"])
     except shader.ShaderException as e:
-        logging.error("GL: Error creating the 'thicklines' shader program:%s" % e)
+        logging.error("GL: Error creating the 'thicklines' shader program: %s", e)
         return None
     logging.debug("GL: Successfully created the 'thicklines' shader program.")
 
@@ -134,13 +142,13 @@ def load_shader() -> Optional[Dict[str, shader.ShaderProgram]]:
 
 def _compile_shader(src: Path, kind: shader.ShaderType) -> Optional[shader.Shader]:
     if not src.is_file():
-        logging.error("GL: Source file for %s shader is not available." % src.name)
+        logging.error("GL: Source file for %s shader is not available.", src.name)
         return None
 
     try:
         new_shader = shader.Shader(src.read_text(encoding="utf-8"), kind)
     except shader.ShaderException as e:
-        logging.error("GL: Error in %s shader:%s" % (kind, e))
+        logging.error("GL: Error in %s shader: %s", kind, e)
         return None
 
     return new_shader
@@ -152,8 +160,8 @@ def get_normal_mat(model_mat: np.ndarray) -> np.ndarray:
     try:
         inv_mat = np.linalg.inv(sub)
     except np.linalg.LinAlgError as e:
-        logging.warning("GL: Error inverting normal matrix: %s" % e)
-        return sub
+        logging.warning("GL: Error inverting normal matrix: %s", e)
+        return np.eye(3, dtype=np.float32)
     # NOTE: inv() always returns np.float64
     return inv_mat.T.astype(np.float32, copy=False)
 
@@ -227,11 +235,9 @@ def create_buffers(create_ebo=True, lines_only=False):
     return vao, vbo, ebo
 
 def fill_buffer(buffer, data, kind) -> None:
-    #print(type(data), data[:10], len(data))
-    gl_array = get_gl_array(data)
+    gl_type = GLuint if kind == GL_ELEMENT_ARRAY_BUFFER else GLfloat
+    gl_array = (gl_type * len(data))(*data)
     glBindBuffer(kind, buffer)
-    # Orphan the buffer before refilling it
-    glBufferData(kind, GLsizeiptr(ctypes.sizeof(gl_array)), None, GL_STATIC_DRAW)
     glBufferData(kind, GLsizeiptr(ctypes.sizeof(gl_array)), gl_array, GL_STATIC_DRAW)
 
 def unload_buffers(vao: GLuint, vbo: GLuint, ebo: GLuint = GLuint(0)) -> None:
@@ -239,45 +245,35 @@ def unload_buffers(vao: GLuint, vbo: GLuint, ebo: GLuint = GLuint(0)) -> None:
 
     glBindBuffer(GL_ARRAY_BUFFER, 0)
     glDeleteBuffers(1, vbo)
-    vbo = GLuint(0)
 
     if ebo.value:
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0)
         glDeleteBuffers(1, ebo)
-        ebo = GLuint(0)
 
     glBindVertexArray(0)
     glDeleteVertexArrays(1, vao)
-    vao = GLuint(0)
 
     logging.debug("GL: Successfully deleted VAO %i, VBO %i, EBO %i",
-                  vao, vbo, ebo)
-
-def get_gl_array(pylist):
-    if isinstance(pylist[0], int):
-        casttype = GLuint
-    else:
-        casttype = GLfloat
-
-    array_type = casttype * len(pylist)
-    return array_type(*pylist)
-
+                  vao.value, vbo.value, ebo.value)
 
 ### UNIFORMS ####
 def load_uniform(shader_id: int, uniform_name: str, data):
     location = glGetUniformLocation(shader_id, uniform_name.encode())
     if location == -1:
-        logging.warning("GL: Could not find Uniform location: %s" % uniform_name)
+        logging.error("GL: Could not find Uniform location: %s", uniform_name)
         return
 
     if isinstance(data, bool):
         glUniform1i(location, int(data))
     elif isinstance(data, float):
         glUniform1f(location, data)
-    elif uniform_name == "u_oColor":
+    elif isinstance(data, (Tuple, List)) and len(data) == 4:
         glUniform4f(location, *data)
+    else:
+        logging.error("GL: load_uniform has no handler for uniform data: %s (%s)",
+                      uniform_name, type(data))
 
-#### UNIFORM BUFFER OJECTS ####
+#### UNIFORM BUFFER OBJECTS ####
 # STD140 padding rules, p - padded
 vec3 = GLfloat * 3
 vec3p = GLfloat * (3 + 1)
@@ -391,9 +387,14 @@ class UniformBuffer:
         self._upload_range("SpecularColor", "SpecularValue")
 
     def update_lights(self, lights):
-        self.data.NumLights = len(lights)
-        for i, light in enumerate(lights):
-            self.data.Lights[i] = light
+        n_lights = len(lights)
+        if n_lights > MAX_LIGHTS:
+            logging.error("GL: Max. %s lights can be uploaded to the shader, %s lights provided.",
+                          MAX_LIGHTS, n_lights)
+        count = min(n_lights, MAX_LIGHTS)
+        self.data.NumLights = count
+        for i in range(count):
+            self.data.Lights[i] = lights[i]
         self._upload_range("NumLights", "Lights")
 
 def bind_shader_ublock(shaderlist, ublock_name: str) -> None:
@@ -402,7 +403,10 @@ def bind_shader_ublock(shaderlist, ublock_name: str) -> None:
     byte_name = ublock_name.encode(encoding="utf-8")
     for sh in shaderlist.values():
         ublock_index = glGetUniformBlockIndex(sh.id, byte_name)
-        glUniformBlockBinding(sh.id, ublock_index, binding_point)
+        if ublock_index != GL_INVALID_INDEX:
+            glUniformBlockBinding(sh.id, ublock_index, binding_point)
+        else:
+            logging.error("GL: Invalid uniform block index of ubo '%s' in shader %i.", ublock_name, sh.id)
 
 def validate_ubo_layout(shader_id: int, structure: type,
                         uniform_names: Dict[str, str]) -> bool:

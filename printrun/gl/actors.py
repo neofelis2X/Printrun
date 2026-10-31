@@ -61,7 +61,7 @@ def triangulate_box(i1: int, i2: int, i3: int, i4: int,
 def high_luminance(bg_color: Tuple[float, float, float]) -> bool:
     '''Returns True (bright) or False (dark) based on the
     luminance (brightness) of the background.'''
-    # Calcualte luminance of the current background color
+    # Calculate luminance of the current background color
     lum = 0.299 * bg_color[0] + 0.587 * bg_color[1] + 0.114 * bg_color[2]
     if lum > 0.5:  # Bright background
         return True
@@ -103,7 +103,7 @@ class BoundingBox:
 
 class ActorBaseClass(ABC):
     """
-    Cursor where the mouse should be in 3D space.
+    An abstract base class that defines the structure of all actors.
     """
     shaderlist = {}
 
@@ -111,7 +111,7 @@ class ActorBaseClass(ABC):
         self.vao = GLuint(0)
         self.vbo = GLuint(0)
         self.ebo = GLuint(0)
-        self.ubo = renderer.UniformBuffer()
+        self.ubo: Optional[renderer.UniformBuffer] = None
         self._modelmatrix = np.eye(4, dtype=np.float32, order='F')
 
     @property
@@ -124,7 +124,7 @@ class ActorBaseClass(ABC):
 
     def unload(self) -> None:
         renderer.unload_buffers(self.vao, self.vbo, self.ebo)
-        logging.debug(_("GL: Unloaded modeldata (%s) from GPU memory.") % self)
+        logging.debug(_("GL: Unloaded modeldata (%s) from GPU memory."), self)
 
     @abstractmethod
     def draw(self) -> None:
@@ -1047,8 +1047,8 @@ class GcodeModel(Model):
                             if self.travels.size < (travel_vertex_k * self.attribute_count + 2 * self.attribute_count):
                                 # arc interpolation extra points allocation
                                 # if the array is full, extend its size by +50%
-                                logging.debug(_("GL: Reallocate GCode travel buffer %d -> %d") % \
-                                              (self.travels.size, int(self.travels.size * 1.5)))
+                                logging.debug(_("GL: Reallocate GCode travel buffer %d -> %d"),
+                                              self.travels.size, int(self.travels.size * 1.5))
 
                                 self.travels.resize(int(self.travels.size * 1.5),
                                                     refcheck = False)
@@ -1179,8 +1179,8 @@ class GcodeModel(Model):
                                 ratio = (index_k + len(new_indices) +
                                          100 * indicesperline) / self.indices.size * 1.5
 
-                                logging.debug(_("GL: Reallocate GCode print buffer %d -> %d") % \
-                                              (self.vertices.size, int(self.vertices.size * ratio)))
+                                logging.debug(_("GL: Reallocate GCode print buffer %d -> %d"),
+                                              self.vertices.size, int(self.vertices.size * ratio))
 
                                 self.vertices.resize(int(self.vertices.size * ratio),
                                                      refcheck = False)
@@ -1254,8 +1254,8 @@ class GcodeModel(Model):
 
         t_end = time.time()
 
-        logging.debug(_('GL: Initialized GCode model in %.2f seconds') % (t_end - t_start))
-        logging.debug(_('GL: GCode model vertex count: %d') % ((len(self.vertices) + len(self.travels)) // self.attribute_count))
+        logging.debug(_('GL: Initialized GCode model in %.2f seconds'), (t_end - t_start))
+        logging.debug(_('GL: GCode model vertex count: %d'), ((len(self.vertices) + len(self.travels)) // self.attribute_count))
         yield None
 
     def copy(self) -> 'GcodeModel':
@@ -1510,8 +1510,8 @@ class GcodeModelLight(Model):
                             # arc interpolation extra points allocation
                             # if the array is full, extend its size by +50%
                             ratio = 1.5
-                            logging.debug(_("GL: Reallocate GCode lite buffer %d -> %d") % \
-                                          (self.vertices.size, int(self.vertices.size * ratio)))
+                            logging.debug(_("GL: Reallocate GCode lite buffer %d -> %d"),
+                                          self.vertices.size, int(self.vertices.size * ratio))
 
                             self.vertices.resize(int(self.vertices.size * ratio),
                                                  refcheck = False)
@@ -1583,8 +1583,8 @@ class GcodeModelLight(Model):
 
         t_end = time.time()
 
-        logging.debug(_('GL: Initialized GCode model lite in %.2f seconds') % (t_end - t_start))
-        logging.debug(_('GL: GCode model lite vertex count: %d') % (self.vertices.size // self.attribute_count))
+        logging.debug(_('GL: Initialized GCode model lite in %.2f seconds'), (t_end - t_start))
+        logging.debug(_('GL: GCode model lite vertex count: %d'), (self.vertices.size // self.attribute_count))
         yield None
 
     def copy(self) -> 'GcodeModelLight':
