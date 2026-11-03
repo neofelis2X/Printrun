@@ -2596,6 +2596,11 @@ class PronterApp(wx.App):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.SetAppName("Pronterface")
+        if sys.platform == "darwin":
+            # wxPython >= 4.3 no longer disables macOS automatic window
+            # tabbing, so secondary frames (e.g. the Spool Manager) would
+            # open as a tab of the main window
+            self.OSXEnableAutomaticTabbing(False)
         lang = wx.Locale.GetSystemLanguage()
         # Fall back to English if unable to determine language
         if lang == wx.LANGUAGE_UNKNOWN:
