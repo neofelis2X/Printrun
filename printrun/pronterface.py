@@ -2601,10 +2601,31 @@ class PronterApp(wx.App):
             # tabbing, so secondary frames (e.g. the Spool Manager) would
             # open as a tab of the main window
             self.OSXEnableAutomaticTabbing(False)
-        lang = wx.Locale.GetSystemLanguage()
-        # Fall back to English if unable to determine language
-        if lang == wx.LANGUAGE_UNKNOWN:
-            lang = wx.LANGUAGE_ENGLISH_US
-        self.locale = wx.Locale(lang)
+        self.locale = self.init_locale()
         self.mainwindow = PronterWindow(self)
         self.mainwindow.Show()
+
+    def init_locale(self):
+        # The system language may not exist as a C locale, e.g. English with
+        # the region set to Austria (en_AT) on macOS. Then fall back to the
+        # language without region and finally to English, instead of showing
+        # a "Cannot set locale" warning on every start.
+        candidates = []
+        lang = wx.Locale.GetSystemLanguage()
+        if lang != wx.LANGUAGE_UNKNOWN:
+            candidates.append(lang)
+            info = wx.Locale.GetLanguageInfo(lang)
+            base_info = wx.Locale.FindLanguageInfo(info.CanonicalName.split("_")[0])
+            if base_info and base_info.Language != lang:
+                candidates.append(base_info.Language)
+        candidates.append(wx.LANGUAGE_ENGLISH_US)
+
+        for lang in candidates:
+            with wx.LogNull():
+                locale = wx.Locale(lang)
+            if locale.IsOk():
+                return locale
+            # Release the failed locale right away, its destructor restores
+            # the previously active locale
+            del locale
+        return None
