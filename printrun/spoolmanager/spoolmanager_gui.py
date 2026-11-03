@@ -52,16 +52,21 @@ class SpoolManagerMainWindow(wx.Frame):
             if self.spool_manager.isLoaded(spool[0]) > (spool_manager.getExtruderCount() - 1):
                 spool_manager.unload(self.spool_manager.isLoaded(spool[0]))
 
+        # The list and its buttons are grouped in a static box and need to be
+        # created as children of it
+        self.list_sizer = wx.StaticBoxSizer(wx.HORIZONTAL, self.panel, label = _("Spool List"))
+        list_box = self.list_sizer.GetStaticBox()
+
         # Generate the list of recorded spools
-        self.spool_list = SpoolListView(self.panel, self.spool_manager)
+        self.spool_list = SpoolListView(list_box, self.spool_manager)
 
         # Generate the buttons
-        self.panel.new_button = wx.Button(self.panel, wx.ID_ADD)
+        self.panel.new_button = wx.Button(list_box, wx.ID_ADD)
         self.panel.new_button.SetToolTip(_("Add a new spool"))
-        self.panel.edit_button = wx.Button(self.panel, wx.ID_EDIT)
+        self.panel.edit_button = wx.Button(list_box, wx.ID_EDIT)
         self.panel.edit_button.SetToolTip(_("Edit the selected spool"))
         self.panel.edit_button.Disable()
-        self.panel.delete_button = wx.Button(self.panel, wx.ID_DELETE)
+        self.panel.delete_button = wx.Button(list_box, wx.ID_DELETE)
         self.panel.delete_button.SetToolTip(_("Delete the selected spool"))
         self.panel.delete_button.Disable()
 
@@ -94,7 +99,6 @@ class SpoolManagerMainWindow(wx.Frame):
             wx.FIXED_MINSIZE | wx.EXPAND | wx.LEFT, get_space('minor'))
 
         ## Group the buttons with the spool list
-        self.list_sizer = wx.StaticBoxSizer(wx.HORIZONTAL, self.panel, label = _("Spool List"))
         self.list_sizer.Add(self.spool_list, 1,
                             wx.EXPAND | wx.LEFT | wx.TOP | wx.BOTTOM, get_space('staticbox'))
         self.list_sizer.Add(self.list_button_sizer, 0,
@@ -255,12 +259,14 @@ class SpoolListView(wx.ListView):
         self.SetColumnWidth(0, max(self.GetClientSize().width - filament_column_width, 0))
 
     def onItemSelect(self, event):
-        self.Parent.edit_button.Enable()
-        self.Parent.delete_button.Enable()
+        panel = self.GetTopLevelParent().panel
+        panel.edit_button.Enable()
+        panel.delete_button.Enable()
 
     def onItemDeselect(self, event):
-        self.Parent.edit_button.Disable()
-        self.Parent.delete_button.Disable()
+        panel = self.GetTopLevelParent().panel
+        panel.edit_button.Disable()
+        panel.delete_button.Disable()
 
 class CurrentSpoolDialog(wx.Panel):
     """
@@ -289,18 +295,24 @@ class CurrentSpoolDialog(wx.Panel):
         button_sizer = []
         dialog_sizer = []
         for i in range(self.extruders):
+            # The widgets of each extruder are grouped in a static box and
+            # need to be created as children of it
+            dialog_sizer.append(wx.StaticBoxSizer(wx.HORIZONTAL,
+                                                  self, label = _("Spool for Extruder %d:") % i))
+            box = dialog_sizer[i].GetStaticBox()
+
             # Generate the dialog with the spool information
-            textlabel = wx.StaticText(self, label = _("Name:\nRemaining filament:"),
+            textlabel = wx.StaticText(box, label = _("Name:\nRemaining filament:"),
                                       style = wx.ALIGN_RIGHT)
             self.extruder_dialog.append(
-                wx.StaticText(self, style = wx.ST_ELLIPSIZE_END))
+                wx.StaticText(box, style = wx.ST_ELLIPSIZE_END))
             self.extruder_dialog[i].SetMinSize(wx.Size(min_size.width, -1))
 
             # Generate the "load" and "unload" buttons
-            load_button.append(wx.Button(self, label = _("Load")))
+            load_button.append(wx.Button(box, label = _("Load")))
             load_button[i].SetToolTip(
                 _("Load selected spool for Extruder %d") % i)
-            self.unload_button.append(wx.Button(self, label = _("Unload")))
+            self.unload_button.append(wx.Button(box, label = _("Unload")))
             self.unload_button[i].Disable()
             self.unload_button[i].SetToolTip(
                 _("Unload the spool for Extruder %d") % i)
@@ -318,8 +330,6 @@ class CurrentSpoolDialog(wx.Panel):
             button_sizer[i].Add(self.unload_button[i], 0,
                 wx.FIXED_MINSIZE | wx.ALIGN_CENTER)
 
-            dialog_sizer.append(wx.StaticBoxSizer(wx.HORIZONTAL,
-                                                  self, label = _("Spool for Extruder %d:") % i))
             dialog_sizer[i].Add(textlabel, 0, wx.ALIGN_TOP | wx.ALL, get_space('staticbox'))
             dialog_sizer[i].AddSpacer(get_space('minor'))
             dialog_sizer[i].Add(self.extruder_dialog[i], 1, wx.ALIGN_TOP | wx.TOP, get_space('staticbox'))
@@ -581,20 +591,23 @@ class SpoolManagerEditWindow(wx.Dialog):
                                         style = wx.TE_RIGHT)
         self.length_field.SetMinSize((minwidth, -1))
 
-        # Generate the buttons
+        # Generate the buttons, they are grouped in a static box and need to be
+        # created as children of it
+        self.btn_sizer = wx.StaticBoxSizer(wx.HORIZONTAL, self)
+        btn_box = self.btn_sizer.GetStaticBox()
         button_min_width = self.GetTextExtent('  +000.0  ').width
-        self.minus3_button = wx.Button(self,
+        self.minus3_button = wx.Button(btn_box,
             label = str(self.quantities[0]))
-        self.minus2_button = wx.Button(self,
+        self.minus2_button = wx.Button(btn_box,
             label = str(self.quantities[1]))
-        self.minus1_button = wx.Button(self,
+        self.minus1_button = wx.Button(btn_box,
             label = str(self.quantities[2]))
 
-        self.plus1_button = wx.Button(self,
+        self.plus1_button = wx.Button(btn_box,
             label = "+" + str(self.quantities[3]))
-        self.plus2_button = wx.Button(self,
+        self.plus2_button = wx.Button(btn_box,
             label = "+" + str(self.quantities[4]))
-        self.plus3_button = wx.Button(self,
+        self.plus3_button = wx.Button(btn_box,
             label = "+" + str(self.quantities[5]))
 
         self.minus3_button.SetSize((button_min_width, -1))
@@ -624,7 +637,6 @@ class SpoolManagerEditWindow(wx.Dialog):
 
         # Layout
         ## Group the length field and its correspondent buttons
-        self.btn_sizer = wx.StaticBoxSizer(wx.HORIZONTAL, self)
         self.btn_sizer.Add(self.minus3_button, 0,
                            wx.FIXED_MINSIZE | wx.ALIGN_CENTER | wx.LEFT | wx.TOP | wx.BOTTOM,
                            get_space('staticbox'))
