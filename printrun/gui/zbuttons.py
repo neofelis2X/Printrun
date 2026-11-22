@@ -38,7 +38,7 @@ class ZButtons(FocusCanvas):
     imagedir = Path("printrun", "assets", "controls")
     imagename = "control_z.png"
 
-    def __init__(self, parent, moveCallback = None, bgcolor = "#FFFFFF", ID=-1):
+    def __init__(self, parent, moveCallback = None, ID=-1):
         imagepath = imagefile(self.imagename, self.imagedir)
         self.bg_bmp = wx.BitmapBundle().FromFiles(str(imagepath.parent), str(imagepath.stem), extension="png")
         self.range = None
@@ -48,10 +48,6 @@ class ZButtons(FocusCanvas):
         self.enabled = False
         # Remember the last clicked value, so we can repeat when spacebar pressed
         self.lastValue = None
-
-        self.bgcolor = wx.Colour()
-        self.bgcolor.Set(bgcolor)
-        self.bgcolormask = wx.Colour(self.bgcolor.Red(), self.bgcolor.Green(), self.bgcolor.Blue(), 128)
 
         # On MS Windows super(style=WANTS_CHARS) prevents tab cycling
         # pass empty style explicitly
@@ -114,12 +110,9 @@ class ZButtons(FocusCanvas):
         return (self.lookupRange(abs(ydelta)), sign(ydelta))
 
     def draw(self, dc, w, h):
-        dc.SetBackground(wx.Brush(self.bgcolor))
-        dc.Clear()
+        self.clearBackground(dc)
         gc = wx.GraphicsContext.Create(dc)
-        if self.bg_bmp:
-            w, h = self.bg_bmp.GetPreferredLogicalSizeFor(self)
-            gc.DrawBitmap(self.bg_bmp.GetBitmapFor(self), 0, 0, w, h)
+        self.drawBackgroundBitmap(gc)
 
         if self.enabled and self.IsEnabled():
             # Draw label overlays
@@ -135,10 +128,6 @@ class ZButtons(FocusCanvas):
             gc.SetBrush(wx.Brush(wx.Colour(0, 0, 0, 128)))
             if self.range is not None and self.direction is not None:
                 self.highlight(gc, self.range, self.direction)
-        else:
-            gc.SetPen(wx.Pen(self.bgcolor, 0))
-            gc.SetBrush(wx.Brush(self.bgcolormask))
-            gc.DrawRectangle(0, 0, w, h)
         self.drawFocusRect(dc)
 
     # ------ #

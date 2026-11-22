@@ -200,7 +200,7 @@ class PronterWindow(MainWindow, pronsole.pronsole):
         self.p.xy_feedrate = self.settings.xy_feedrate
         self.p.z_feedrate = self.settings.z_feedrate
 
-        self.panel.SetBackgroundColour(self.bgcolor)
+        self.apply_bgcolor(self.panel)
         self.menustrip = wx.MenuBar()
         self.reload_ui()
         # disable all printer controls until we connect to a printer
@@ -248,6 +248,7 @@ class PronterWindow(MainWindow, pronsole.pronsole):
         self.settings.monitor = False
         self.update_monitor()
         self.Freeze()
+        self.apply_bgcolor(self.panel)
 
         # If UI is being recreated, delete current one
         if self.ui_ready:
@@ -425,8 +426,7 @@ class PronterWindow(MainWindow, pronsole.pronsole):
                 return self.settings.bgcolor_dark
             return self.settings.bgcolor
 
-        native = wx.SystemSettings.GetColour(wx.SYS_COLOUR_WINDOW)
-        return native.GetAsString(flags=wx.C2S_HTML_SYNTAX)
+        return self._preferred_bgcolour_hex()
 
     #  --------------------------------------------------------------
     #  Main interface actions
@@ -1160,13 +1160,9 @@ Printrun. If not, see <http://www.gnu.org/licenses/>."""
         self.settings._add(recentfilessetting, self.update_recent_files)
 
     def _preferred_bgcolour_hex(self):
-        id = wx.SYS_COLOUR_WINDOW
-
-        # Do linux platform need different bgcolor ?
-        # if platform.system() not in ("Windows", "Darwin"):
-        #     id = wx.SYS_COLOUR_BACKGROUND
-
-        sys_bgcolour = wx.SystemSettings.GetColour(id)
+        # BTNFACE is the native window/dialog surface on all platforms,
+        # SYS_COLOUR_WINDOW would be the (often white) text field background
+        sys_bgcolour = wx.SystemSettings.GetColour(wx.SYS_COLOUR_BTNFACE)
         return sys_bgcolour.GetAsString(flags=wx.C2S_HTML_SYNTAX)
 
     def add_cmdline_arguments(self, parser):

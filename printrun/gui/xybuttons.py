@@ -35,11 +35,40 @@ HOVER_BRUSH_COLOR = wx.Colour(0, 0, 0, 128)
 class FocusCanvas(BufferedCanvas):
     def __init__(self, *args, **kwds):
         super().__init__(*args, **kwds)
+        self.SetBackgroundStyle(wx.BG_STYLE_PAINT)
         self.Bind(wx.EVT_SET_FOCUS, self.onFocus)
 
     def onFocus(self, evt):
         self.Refresh()
         evt.Skip()
+
+    def onPaint(self, event):
+        w, h = self.GetClientSize()
+        if not w or not h:
+            return
+        # On macOS this is a plain PaintDC (the system double buffers),
+        # so the native window background shows through unpainted areas.
+        dc = wx.AutoBufferedPaintDC(self)
+        self.draw(dc, w, h)
+
+    def clearBackground(self, dc):
+        """Fill the canvas with the background of the parent window."""
+        if wx.Platform == "__WXMAC__":
+            return
+        dc.SetBackground(wx.Brush(self.GetParent().GetBackgroundColour()))
+        dc.Clear()
+
+    def drawBackgroundBitmap(self, gc):
+        """Draw the control image, faded out when the control is disabled."""
+        if not self.bg_bmp:
+            return
+        enabled = self.enabled and self.IsEnabled()
+        w, h = self.bg_bmp.GetPreferredLogicalSizeFor(self)
+        if not enabled:
+            gc.BeginLayer(0.5)
+        gc.DrawBitmap(self.bg_bmp.GetBitmapFor(self), 0, 0, w, h)
+        if not enabled:
+            gc.EndLayer()
 
     def drawFocusRect(self, dc):
         if self.HasFocus():
@@ -79,7 +108,7 @@ class XYButtons(FocusCanvas):
         3: "all",
     }
 
-    def __init__(self, parent, moveCallback = None, cornerCallback = None, spacebarCallback = None, bgcolor = "#FFFFFF", ID=-1, zcallback=None):
+    def __init__(self, parent, moveCallback = None, cornerCallback = None, spacebarCallback = None, ID=-1, zcallback=None):
         imagepath = imagefile(self.imagename, self.imagedir)
         self.bg_bmp = wx.BitmapBundle().FromFiles(str(imagepath.parent), str(imagepath.stem), extension="png")
         self.keypad_bmp = wx.BitmapBundle().FromSVGFile(str(imagefile("arrow_keys.svg", self.imagedir)), (33, 23))
@@ -96,10 +125,6 @@ class XYButtons(FocusCanvas):
         # Remember the last clicked buttons, so we can repeat when spacebar pressed
         self.lastMove = None
         self.lastCorner = None
-
-        self.bgcolor = wx.Colour()
-        self.bgcolor.Set(bgcolor)
-        self.bgcolormask = wx.Colour(self.bgcolor.Red(), self.bgcolor.Green(), self.bgcolor.Blue(), 128)
 
         super().__init__(parent, ID, size=self.bg_bmp.GetPreferredLogicalSizeFor(parent))
 
@@ -275,13 +300,9 @@ class XYButtons(FocusCanvas):
         gc.DrawEllipse(cx - radius, cy - radius, radius * 2, radius * 2)
 
     def draw(self, dc, w, h):
-        dc.SetBackground(wx.Brush(self.bgcolor))
-        dc.Clear()
+        self.clearBackground(dc)
         gc = wx.GraphicsContext.Create(dc)
-
-        if self.bg_bmp:
-            w, h = self.bg_bmp.GetPreferredLogicalSizeFor(self)
-            gc.DrawBitmap(self.bg_bmp.GetBitmapFor(self), 0, 0, w, h)
+        self.drawBackgroundBitmap(gc)
 
         if self.enabled and self.IsEnabled():
             gc.SetPen(wx.Pen(HOVER_PEN_COLOR, 4))
@@ -314,11 +335,7 @@ class XYButtons(FocusCanvas):
                 if idx != self.concentric:
                     r = kpos[2]
                     gc.DrawEllipse(kpos[0] - r, kpos[1] - r, r * 2, r * 2)
-        else:
-            gc.SetPen(wx.Pen(self.bgcolor, 0))
-            gc.SetBrush(wx.Brush(self.bgcolormask))
-            gc.DrawRectangle(0, 0, w, h)
-    
+
         self.drawFocusRect(dc)
 
         # Used to check exact position of keypad dots, should we ever resize the bg image
@@ -534,13 +551,9 @@ class XYButtonsMini(XYButtons):
         gc.PopState()
 
     def draw(self, dc, w, h):
-        dc.SetBackground(wx.Brush(self.bgcolor))
-        dc.Clear()
+        self.clearBackground(dc)
         gc = wx.GraphicsContext.Create(dc)
-
-        if self.bg_bmp:
-            w, h = self.bg_bmp.GetPreferredLogicalSizeFor(self)
-            gc.DrawBitmap(self.bg_bmp.GetBitmapFor(self), 0, 0, w, h)
+        self.drawBackgroundBitmap(gc)
 
         if self.enabled and self.IsEnabled():
             gc.SetPen(wx.Pen(HOVER_PEN_COLOR, 4))
@@ -551,7 +564,3 @@ class XYButtonsMini(XYButtons):
                     self.drawCenteredDisc(gc, self.concentric_circle_radii[-1])
                 elif self.corner is not None:
                     self.highlightCorner(gc, self.corner)
-        else:
-            gc.SetPen(wx.Pen(self.bgcolor, 0))
-            gc.SetBrush(wx.Brush(self.bgcolormask))
-            gc.DrawRectangle(0, 0, w, h)

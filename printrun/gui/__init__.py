@@ -128,20 +128,27 @@ class MainWindow(wx.Frame):
         self.panels = []
         self.printerControls = []
 
+    def apply_bgcolor(self, window):
+        """Set the custom background color, or keep the native default."""
+        if self.settings.use_bgcolor:
+            window.SetBackgroundColour(self.bgcolor)
+        else:
+            window.SetBackgroundColour(wx.NullColour)
+
     def newPanel(self, parent, add_to_list = True):
         panel = wx.Panel(parent)
         self.registerPanel(panel, add_to_list)
         return panel
 
     def registerPanel(self, panel, add_to_list = True):
-        panel.SetBackgroundColour(self.bgcolor)
+        self.apply_bgcolor(panel)
         if add_to_list:
             self.panels.append(panel)
 
     def createTabbedGui(self):
         self.notesizer = wx.BoxSizer(wx.VERTICAL)
         self.notebook = wx.Notebook(self.panel)
-        self.notebook.SetBackgroundColour(self.bgcolor)
+        self.apply_bgcolor(self.notebook)
         page1panel = self.newPanel(self.notebook)
         page2panel = self.newPanel(self.notebook)
         self.mainsizer_page1 = wx.BoxSizer(wx.VERTICAL)
