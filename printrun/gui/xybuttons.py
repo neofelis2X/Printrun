@@ -27,20 +27,38 @@ def sign(n):
         return 1
     return 0
 
-DASHES = [4, 7]
 # Brush and pen for grey overlay when mouse hovers over
 HOVER_PEN_COLOR = wx.Colour(100, 100, 100, 172)
 HOVER_BRUSH_COLOR = wx.Colour(0, 0, 0, 128)
 
 class FocusCanvas(BufferedCanvas):
+    """Base for the custom drawn jog controls.
+
+    Subclasses provide `bg_bmp` and implement `drawOverlays(gc)`,
+    which is only called while the control is enabled.
+    """
     def __init__(self, *args, **kwds):
         super().__init__(*args, **kwds)
         self.SetBackgroundStyle(wx.BG_STYLE_PAINT)
-        self.Bind(wx.EVT_SET_FOCUS, self.onFocus)
+        self.Disable()  # until a printer is connected
+        self.Bind(wx.EVT_SET_FOCUS, self.onFocusChange)
+        self.Bind(wx.EVT_KILL_FOCUS, self.onFocusChange)
 
-    def onFocus(self, evt):
+    def onFocusChange(self, evt):
         self.Refresh()
         evt.Skip()
+
+    # wx does not repaint custom windows when their enabled state changes.
+    # Disable() is implemented in C++ and would bypass a Python override
+    # of Enable(), so both are overridden.
+    def Enable(self, enable = True):
+        changed = super().Enable(enable)
+        if changed:
+            self.Refresh()
+        return changed
+
+    def Disable(self):
+        return self.Enable(False)
 
     def onPaint(self, event):
         w, h = self.GetClientSize()
@@ -50,6 +68,22 @@ class FocusCanvas(BufferedCanvas):
         # so the native window background shows through unpainted areas.
         dc = wx.AutoBufferedPaintDC(self)
         self.draw(dc, w, h)
+
+    def draw(self, dc, w, h):
+        self.clearBackground(dc)
+        gc = wx.GraphicsContext.Create(dc)
+        self.drawBackgroundBitmap(gc)
+        if self.IsEnabled():
+            self.drawOverlays(gc)
+        # Destroying the context flushes its output to the DC, so the
+        # focus rectangle drawn on the DC afterwards ends up on top.
+        gc.Flush()
+        del gc
+        self.drawFocusRect(dc)
+
+    def drawOverlays(self, gc):
+        """Stub: draw hover highlights etc. on top of the control image."""
+        pass
 
     def clearBackground(self, dc):
         """Fill the canvas with the background of the parent window."""
@@ -62,7 +96,7 @@ class FocusCanvas(BufferedCanvas):
         """Draw the control image, faded out when the control is disabled."""
         if not self.bg_bmp:
             return
-        enabled = self.enabled and self.IsEnabled()
+        enabled = self.IsEnabled()
         w, h = self.bg_bmp.GetPreferredLogicalSizeFor(self)
         if not enabled:
             gc.BeginLayer(0.5)
@@ -72,11 +106,9 @@ class FocusCanvas(BufferedCanvas):
 
     def drawFocusRect(self, dc):
         if self.HasFocus():
-            pen = wx.Pen(wx.BLACK, 1, wx.PENSTYLE_USER_DASH)
-            pen.SetDashes(DASHES)
-            dc.Pen = pen
-            dc.Brush = wx.Brush(wx.TRANSPARENT_BRUSH)
-            dc.DrawRectangle(self.ClientRect)
+            # Native focus indicator, e.g. the accent colored ring on macOS
+            rect = self.GetClientRect().Deflate(2, 2)
+            wx.RendererNative.Get().DrawFocusRect(self, dc, rect)
 
 class XYButtons(FocusCanvas):
     keypad_positions = {
@@ -121,7 +153,6 @@ class XYButtons(FocusCanvas):
         self.cornerCallback = cornerCallback
         self.spacebarCallback = spacebarCallback
         self.zCallback = zcallback
-        self.enabled = False
         # Remember the last clicked buttons, so we can repeat when spacebar pressed
         self.lastMove = None
         self.lastCorner = None
@@ -142,14 +173,6 @@ class XYButtons(FocusCanvas):
     def onKillFocus(self, evt):
         self.setKeypadIndex(-1)
         evt.Skip()
-
-    def disable(self):
-        self.Enabled = self.enabled = False
-        self.update()
-
-    def enable(self):
-        self.Enabled = self.enabled = True
-        self.update()
 
     def repeatLast(self):
         if self.lastMove:
@@ -299,44 +322,37 @@ class XYButtons(FocusCanvas):
         cx, cy = self.center
         gc.DrawEllipse(cx - radius, cy - radius, radius * 2, radius * 2)
 
-    def draw(self, dc, w, h):
-        self.clearBackground(dc)
-        gc = wx.GraphicsContext.Create(dc)
-        self.drawBackgroundBitmap(gc)
+    def drawOverlays(self, gc):
+        gc.SetPen(wx.Pen(HOVER_PEN_COLOR, 4))
+        gc.SetBrush(wx.Brush(HOVER_BRUSH_COLOR))
 
-        if self.enabled and self.IsEnabled():
-            gc.SetPen(wx.Pen(HOVER_PEN_COLOR, 4))
-            gc.SetBrush(wx.Brush(HOVER_BRUSH_COLOR))
+        if self.concentric is not None:
+            if self.concentric < len(self.concentric_circle_radii):
+                if self.concentric == 0:
+                    self.drawCenteredDisc(gc, self.concentric_circle_radii[1])
+                elif self.quadrant is not None:
+                    self.highlightQuadrant(gc, self.quadrant, self.concentric)
+            elif self.corner is not None:
+                self.highlightCorner(gc, self.corner)
 
-            if self.concentric is not None:
-                if self.concentric < len(self.concentric_circle_radii):
-                    if self.concentric == 0:
-                        self.drawCenteredDisc(gc, self.concentric_circle_radii[1])
-                    elif self.quadrant is not None:
-                        self.highlightQuadrant(gc, self.quadrant, self.concentric)
-                elif self.corner is not None:
-                    self.highlightCorner(gc, self.corner)
+        if self.keypad_idx >= 0:
+            padw, padh = self.keypad_bmp.GetPreferredLogicalSizeFor(self)
+            pos = self.keypad_positions[self.keypad_idx]
+            pos = (pos[0] - padw / 2 - 3, pos[1] - padh / 2 - 3)
+            gc.DrawBitmap(self.keypad_bmp.GetBitmapFor(self), pos[0], pos[1], padw, padh)
 
-            if self.keypad_idx >= 0:
-                padw, padh = self.keypad_bmp.GetPreferredLogicalSizeFor(self)
-                pos = self.keypad_positions[self.keypad_idx]
-                pos = (pos[0] - padw / 2 - 3, pos[1] - padh / 2 - 3)
-                gc.DrawBitmap(self.keypad_bmp.GetBitmapFor(self), pos[0], pos[1], padw, padh)
+        if self.hovered_keypad is not None and self.hovered_keypad != self.keypad_idx:
+            pos = self.keypad_positions[self.hovered_keypad]
+            r = XYButtons.keypad_radius
+            gc.DrawEllipse(pos[0]-r/2, pos[1]-r/2, r, r)
 
-            if self.hovered_keypad is not None and self.hovered_keypad != self.keypad_idx:
-                pos = self.keypad_positions[self.hovered_keypad]
-                r = XYButtons.keypad_radius
-                gc.DrawEllipse(pos[0]-r/2, pos[1]-r/2, r, r)
-
-            # Draw label overlays
-            gc.SetPen(wx.Pen(wx.Colour(255, 255, 255, 128), 1))
-            gc.SetBrush(wx.Brush(wx.Colour(255, 255, 255, 128 + 64)))
-            for idx, kpos in self.label_overlay_positions.items():
-                if idx != self.concentric:
-                    r = kpos[2]
-                    gc.DrawEllipse(kpos[0] - r, kpos[1] - r, r * 2, r * 2)
-
-        self.drawFocusRect(dc)
+        # Draw label overlays
+        gc.SetPen(wx.Pen(wx.Colour(255, 255, 255, 128), 1))
+        gc.SetBrush(wx.Brush(wx.Colour(255, 255, 255, 128 + 64)))
+        for idx, kpos in self.label_overlay_positions.items():
+            if idx != self.concentric:
+                r = kpos[2]
+                gc.DrawEllipse(kpos[0] - r, kpos[1] - r, r * 2, r * 2)
 
         # Used to check exact position of keypad dots, should we ever resize the bg image
         # for idx, kpos in self.label_overlay_positions.items():
@@ -347,7 +363,7 @@ class XYButtons(FocusCanvas):
     # ------ #
     def OnKey(self, evt):
         # print('XYButtons key', evt.GetKeyCode())
-        if not self.enabled:
+        if not self.IsEnabled():
             evt.Skip()
             return
         key = evt.KeyCode
@@ -398,7 +414,7 @@ class XYButtons(FocusCanvas):
             evt.Skip()
 
     def OnMotion(self, event):
-        if not self.enabled:
+        if not self.IsEnabled():
             return
 
         oldcorner = self.corner
@@ -434,7 +450,7 @@ class XYButtons(FocusCanvas):
             self.update()
 
     def OnLeftDown(self, event):
-        if not self.enabled:
+        if not self.IsEnabled():
             return
 
         # Take focus when clicked so that arrow keys can control movement
@@ -492,7 +508,7 @@ class XYButtonsMini(XYButtons):
         self.Bind(wx.EVT_LEAVE_WINDOW, self.OnLeaveWindow)
 
     def OnMotion(self, event):
-        if not self.enabled:
+        if not self.IsEnabled():
             return
 
         oldcorner = self.corner
@@ -516,7 +532,7 @@ class XYButtonsMini(XYButtons):
             self.update()
 
     def OnLeftDown(self, event):
-        if not self.enabled:
+        if not self.IsEnabled():
             return
 
         # Take focus when clicked so that arrow keys can control movement
@@ -550,17 +566,12 @@ class XYButtonsMini(XYButtons):
         gc.DrawPath(path)
         gc.PopState()
 
-    def draw(self, dc, w, h):
-        self.clearBackground(dc)
-        gc = wx.GraphicsContext.Create(dc)
-        self.drawBackgroundBitmap(gc)
+    def drawOverlays(self, gc):
+        gc.SetPen(wx.Pen(HOVER_PEN_COLOR, 4))
+        gc.SetBrush(wx.Brush(HOVER_BRUSH_COLOR))
 
-        if self.enabled and self.IsEnabled():
-            gc.SetPen(wx.Pen(HOVER_PEN_COLOR, 4))
-            gc.SetBrush(wx.Brush(HOVER_BRUSH_COLOR))
-
-            if self.concentric is not None:
-                if self.concentric < len(self.concentric_circle_radii):
-                    self.drawCenteredDisc(gc, self.concentric_circle_radii[-1])
-                elif self.corner is not None:
-                    self.highlightCorner(gc, self.corner)
+        if self.concentric is not None:
+            if self.concentric < len(self.concentric_circle_radii):
+                self.drawCenteredDisc(gc, self.concentric_circle_radii[-1])
+            elif self.corner is not None:
+                self.highlightCorner(gc, self.corner)

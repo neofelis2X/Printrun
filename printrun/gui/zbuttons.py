@@ -45,7 +45,6 @@ class ZButtons(FocusCanvas):
         self.direction = None
         self.orderOfMagnitudeIdx = 0  # 0 means '1', 1 means '10', 2 means '100', etc.
         self.moveCallback = moveCallback
-        self.enabled = False
         # Remember the last clicked value, so we can repeat when spacebar pressed
         self.lastValue = None
 
@@ -58,22 +57,6 @@ class ZButtons(FocusCanvas):
         self.Bind(wx.EVT_LEFT_DCLICK, self.OnLeftDown)
         self.Bind(wx.EVT_MOTION, self.OnMotion)
         self.Bind(wx.EVT_LEAVE_WINDOW, self.OnLeaveWindow)
-        self.Bind(wx.EVT_SET_FOCUS, self.RefreshFocus)
-        self.Bind(wx.EVT_KILL_FOCUS, self.RefreshFocus)
-    
-    def RefreshFocus(self, evt):
-        self.Refresh()
-        evt.Skip()
-
-    def disable(self):
-        self.Enabled = False # prevents focus
-        self.enabled = False
-        self.update()
-
-    def enable(self):
-        self.Enabled = True
-        self.enabled = True
-        self.update()
 
     def repeatLast(self):
         if self.lastValue:
@@ -109,33 +92,27 @@ class ZButtons(FocusCanvas):
         ydelta = self.center[1] - pos[1]
         return (self.lookupRange(abs(ydelta)), sign(ydelta))
 
-    def draw(self, dc, w, h):
-        self.clearBackground(dc)
-        gc = wx.GraphicsContext.Create(dc)
-        self.drawBackgroundBitmap(gc)
+    def drawOverlays(self, gc):
+        # Draw label overlays
+        gc.SetPen(wx.Pen(wx.Colour(255, 255, 255, 128), 1))
+        gc.SetBrush(wx.Brush(wx.Colour(255, 255, 255, 128 + 64)))
+        for idx, kpos in self.label_overlay_positions.items():
+            if idx != self.range:
+                r = kpos[2]
+                gc.DrawEllipse(self.center[0] - kpos[0] - r, self.center[1] - kpos[1] - r, r * 2, r * 2)
 
-        if self.enabled and self.IsEnabled():
-            # Draw label overlays
-            gc.SetPen(wx.Pen(wx.Colour(255, 255, 255, 128), 1))
-            gc.SetBrush(wx.Brush(wx.Colour(255, 255, 255, 128 + 64)))
-            for idx, kpos in self.label_overlay_positions.items():
-                if idx != self.range:
-                    r = kpos[2]
-                    gc.DrawEllipse(self.center[0] - kpos[0] - r, self.center[1] - kpos[1] - r, r * 2, r * 2)
-
-            # Top 'layer' is the mouse-over highlights
-            gc.SetPen(wx.Pen(wx.Colour(100, 100, 100, 172), 4))
-            gc.SetBrush(wx.Brush(wx.Colour(0, 0, 0, 128)))
-            if self.range is not None and self.direction is not None:
-                self.highlight(gc, self.range, self.direction)
-        self.drawFocusRect(dc)
+        # Top 'layer' is the mouse-over highlights
+        gc.SetPen(wx.Pen(wx.Colour(100, 100, 100, 172), 4))
+        gc.SetBrush(wx.Brush(wx.Colour(0, 0, 0, 128)))
+        if self.range is not None and self.direction is not None:
+            self.highlight(gc, self.range, self.direction)
 
     # ------ #
     # Events #
     # ------ #
 
     def OnMotion(self, event):
-        if not self.enabled:
+        if not self.IsEnabled():
             return
 
         oldr, oldd = self.range, self.direction
@@ -147,7 +124,7 @@ class ZButtons(FocusCanvas):
             self.update()
 
     def OnLeftDown(self, event):
-        if not self.enabled:
+        if not self.IsEnabled():
             return
 
         mpos = event.GetPosition()

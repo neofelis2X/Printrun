@@ -308,8 +308,8 @@ class MainWindow(wx.Frame):
         self.cbuttons_reload()
 
     def gui_set_connected(self):
-        self.xyb.enable()
-        self.zb.enable()
+        self.xyb.Enable()
+        self.zb.Enable()
         for control in self.printerControls:
             control.Enable()
 
@@ -319,5 +319,5 @@ class MainWindow(wx.Frame):
         self.recoverbtn.Disable()
         for control in self.printerControls:
             control.Disable()
-        self.xyb.disable()
-        self.zb.disable()
+        self.xyb.Disable()
+        self.zb.Disable()
