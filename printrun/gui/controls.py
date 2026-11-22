@@ -313,11 +313,12 @@ def add_extra_controls(self, root, parentpanel, extra_buttons = None, mini_mode 
     # Extrusion controls #
 
     # Extrusion settings
-    esettingspanel = root.newPanel(parentpanel)
+    eboxsizer = wx.StaticBoxSizer(wx.VERTICAL, parentpanel, _("Extrude Filament"))
+    extr_sbox = eboxsizer.GetStaticBox()
     esettingssizer = wx.GridBagSizer(vgap = get_space("mini"), hgap = get_space("mini"))
     esettingssizer.SetEmptyCellSize(wx.Size(-1, -1))
     esettingssizer.SetFlexibleDirection(wx.BOTH)
-    root.edist = wx.SpinCtrlDouble(esettingspanel, -1, initial = root.settings.last_extrusion, min = 0, max = 1000)
+    root.edist = wx.SpinCtrlDouble(extr_sbox, -1, initial = root.settings.last_extrusion, min = 0, max = 1000)
     root.edist.SetMinSize(wx.Size(120, -1))
     root.edist.SetDigits(1)
     root.edist.Bind(wx.EVT_SPINCTRLDOUBLE, root.setfeeds)
@@ -325,10 +326,10 @@ def add_extra_controls(self, root, parentpanel, extra_buttons = None, mini_mode 
 
     add("edist_val", root.edist, container = esettingssizer,
         flag = wx.EXPAND | wx.ALIGN_LEFT | wx.ALIGN_CENTER_VERTICAL)
-    add("edist_unit", wx.StaticText(esettingspanel, -1, _("mm @")),
+    add("edist_unit", wx.StaticText(extr_sbox, -1, _("mm @")),
         container = esettingssizer, flag = wx.ALIGN_LEFT | wx.ALIGN_CENTER_VERTICAL)
     root.edist.SetToolTip(wx.ToolTip(_("Amount to Extrude or Retract (mm)")))
-    root.efeedc = wx.SpinCtrlDouble(esettingspanel, -1,
+    root.efeedc = wx.SpinCtrlDouble(extr_sbox, -1,
                                     initial = root.settings.e_feedrate,
                                     min = 0, max = 50000)
     root.efeedc.SetMinSize(wx.Size(120, -1))
@@ -338,20 +339,20 @@ def add_extra_controls(self, root, parentpanel, extra_buttons = None, mini_mode 
     root.efeedc.Bind(wx.EVT_TEXT, root.setfeeds)
     add("efeed_val", root.efeedc, container = esettingssizer,
         flag =  wx.EXPAND | wx.ALIGN_LEFT | wx.ALIGN_CENTER_VERTICAL)
-    add("efeed_unit", wx.StaticText(esettingspanel, -1, _("mm/min")),
+    add("efeed_unit", wx.StaticText(extr_sbox, -1, _("mm/min")),
         container = esettingssizer, flag = wx.ALIGN_LEFT | wx.ALIGN_CENTER_VERTICAL)
 
     if not mini_mode:
-        add("edist_label", wx.StaticText(esettingspanel, -1, _("Length:")),
+        add("edist_label", wx.StaticText(extr_sbox, -1, _("Length:")),
             container = esettingssizer, flag = wx.ALIGN_LEFT | wx.ALIGN_CENTER_VERTICAL)
-        add("efeed_label", wx.StaticText(esettingspanel, -1, _("Speed:")),
+        add("efeed_label", wx.StaticText(extr_sbox, -1, _("Speed:")),
             container = esettingssizer, flag = wx.ALIGN_LEFT | wx.ALIGN_CENTER_VERTICAL)
 
     ebuttonssizer = wx.BoxSizer(wx.HORIZONTAL)
     if root.settings.extruders > 1:
-        etool_label = wx.StaticText(esettingspanel, -1, _("Tool:"))
+        etool_label = wx.StaticText(extr_sbox, -1, _("Tool:"))
         if root.settings.extruders == 2:
-            root.extrudersel = wx.Button(esettingspanel, -1, "0", style = wx.BU_EXACTFIT)
+            root.extrudersel = wx.Button(extr_sbox, -1, "0", style = wx.BU_EXACTFIT)
             root.extrudersel.SetToolTip(wx.ToolTip(_("Click to switch current extruder")))
 
             def extrudersel_cb(event):
@@ -366,7 +367,7 @@ def add_extra_controls(self, root, parentpanel, extra_buttons = None, mini_mode 
             root.extrudersel.SetValue = root.extrudersel.SetLabel
         else:
             choices = [str(i) for i in range(0, root.settings.extruders)]
-            root.extrudersel = wx.ComboBox(esettingspanel, -1, choices = choices,
+            root.extrudersel = wx.ComboBox(extr_sbox, -1, choices = choices,
                                            style = wx.CB_DROPDOWN | wx.CB_READONLY,
                                            size = wx.Size(50, -1))
             root.extrudersel.SetToolTip(wx.ToolTip(_("Select current extruder")))
@@ -381,7 +382,7 @@ def add_extra_controls(self, root, parentpanel, extra_buttons = None, mini_mode 
 
     for key in ["extrude", "reverse"]:
         desc = root.cpbuttons[key]
-        btn = make_custom_button(root, esettingspanel, desc,
+        btn = make_custom_button(root, extr_sbox, desc,
                                  style = wx.BU_EXACTFIT)
         ebuttonssizer.Add(btn, proportion = 1, flag = wx.EXPAND)
 
@@ -391,8 +392,9 @@ def add_extra_controls(self, root, parentpanel, extra_buttons = None, mini_mode 
 
     esettingssizer.AddGrowableCol(0)
     esettingssizer.AddGrowableCol(2)
-    esettingspanel.SetSizer(esettingssizer)
-    add("esettings", esettingspanel, flag = wx.EXPAND | wx.ALIGN_LEFT | wx.TOP | wx.BOTTOM,
+    eboxsizer.Add(esettingssizer, proportion = 1, flag = wx.EXPAND | wx.ALL,
+                  border = get_space("none"))
+    add("esettings", eboxsizer, flag = wx.EXPAND | wx.ALIGN_LEFT | wx.TOP | wx.BOTTOM,
         border = get_space("minor"))
 
 class ControlsSizer(wx.GridBagSizer):
