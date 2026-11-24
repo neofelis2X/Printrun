@@ -888,6 +888,16 @@ class PronterWindow(MainWindow, pronsole.pronsole):
         self.SetMenuBar(self.menustrip)
 
         m = wx.Menu()
+        self.Bind(wx.EVT_MENU, self.system_info,
+                  m.Append(-1, _("&System Information"),
+                           _("Sums up debugging information about the system and Printrun")))
+        self.Bind(wx.EVT_MENU, self.open_settings_dir,
+                  m.Append(-1, _("&Open Settings Directory"),
+                           _("Opens the directory that contains the Printrun settings file")))
+        self.menu_update = m.Append(-1, _("&Check for Update"),
+                                    _("Checks if there is a new version of Printrun on GitHub"))
+        self.Bind(wx.EVT_MENU, self.check_update, self.menu_update)
+        m.Append(-1, kind=wx.ITEM_SEPARATOR)
         self.Bind(wx.EVT_MENU, self.about,
                   m.Append(-1, _("&About Printrun"), _("Show about dialog")))
         self.menustrip.Append(m, _("&Help"))
@@ -911,6 +921,30 @@ class PronterWindow(MainWindow, pronsole.pronsole):
     def show_spool_manager(self, event):
         """Show Spool Manager Window"""
         spoolmanager_gui.SpoolManagerMainWindow(self, self.spool_manager).Show()
+
+    def system_info(self, event):
+        """Show System Info Dialog"""
+        for window in self.GetChildren():
+            if isinstance(window, about.SystemInfo):
+                window.Show()
+                window.Raise()
+                return
+        about.SystemInfo(self, self.settings.log_path).Show()
+
+    def open_settings_dir(self, event):
+        """Open the settings directory"""
+        about.open_rc_dir()
+
+    def check_update(self, event):
+        """Check for an update on GitHub"""
+        status = about.check_update(self)
+        if status == 0:
+            self.menu_update.SetItemLabel(_("You are up-to-date"))
+            self.menu_update.Enable(False)
+        elif status == 1:
+            self.menu_update.SetItemLabel(_("Update available!"))
+        else:
+            self.menu_update.SetItemLabel(_("Update: Connection failed"))
 
     def about(self, event):
         """Show the About Printrun Window"""
