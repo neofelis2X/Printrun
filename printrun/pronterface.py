@@ -25,20 +25,33 @@ import subprocess
 import glob
 import logging
 import re
+import configparser
+import itertools
 
 try: import simplejson as json
 except ImportError: import json
 
 from . import pronsole
-from . import printcore
+from . import stlplater as plater
+from . import gcodeplater as gcplater
+from .excluder import Excluder
+from printrun import projectlayer, gcoder
 from printrun.spoolmanager import spoolmanager_gui
 from .gui import about
 
-from .gui.utils import get_iconbundle, get_scaled_icon
+from .gui.utils import get_iconbundle
+from .gui.widgets import SpecialButton, MacroEditor, PronterOptions, ButtonEdit, get_space
+
+from .gui import MainWindow
+from .settings import HiddenSetting, StringSetting, SpinSetting, \
+    FloatSpinSetting, BooleanSetting, StaticTextSetting, ColorSetting, ComboSetting
+from .pronsole import REPORT_NONE, REPORT_POS, REPORT_TEMP, REPORT_MANUAL
+
 from .utils import install_locale, setup_logging, dosify, \
     format_time, format_duration, \
     hexcolor_to_float, parse_temperature_report, \
-    prepare_command, compile_file, write_history_to, read_history_from
+    prepare_command, write_history_to, read_history_from
+
 install_locale('pronterface')
 
 try:
@@ -50,8 +63,6 @@ except:
     logging.error(_("WX >= 4 is not installed. This program requires WX >= 4 to run."))
     raise
 
-from .gui.widgets import SpecialButton, MacroEditor, PronterOptions, ButtonEdit, get_space
-
 winsize = (800, 500)
 layerindex = 0
 if os.name == "nt":
@@ -61,13 +72,6 @@ pronterface_quitting = False
 
 class PronterfaceQuitException(Exception):
     pass
-
-
-from .gui import MainWindow
-from .settings import wxSetting, HiddenSetting, StringSetting, SpinSetting, \
-    FloatSpinSetting, BooleanSetting, StaticTextSetting, ColorSetting, ComboSetting
-from printrun import gcoder
-from .pronsole import REPORT_NONE, REPORT_POS, REPORT_TEMP, REPORT_MANUAL
 
 def format_length(mm, fractional=2):
     if mm <= 10:
@@ -601,8 +605,7 @@ class PronterWindow(MainWindow, pronsole.pronsole):
             e.Skip()
 
     def plate(self, e):
-        from . import stlplater as plater
-        self.log(_("Plate function activated"))
+        self.log(_("STL plate function activated"))
         plater.StlPlater(size = (800, 580), callback = self.platecb,
                          parent = self,
                          build_dimensions = self.build_dimensions_list,
@@ -613,9 +616,8 @@ class PronterWindow(MainWindow, pronsole.pronsole):
                          iconbundle = self.GetIcons()).Show()
 
     def plate_gcode(self, e):
-        from . import gcodeplater as plater
         self.log(_("G-Code plate function activated"))
-        plater.GcodePlater(size = (800, 580), callback = self.platecb,
+        gcplater.GcodePlater(size = (800, 580), callback = self.platecb,
                            parent = self,
                            build_dimensions = self.build_dimensions_list,
                            circular_platform = self.settings.circular_bed,
@@ -904,7 +906,6 @@ class PronterWindow(MainWindow, pronsole.pronsole):
 
     def project(self, event):
         """Start Projector tool"""
-        from printrun import projectlayer
         projectlayer.SettingsFrame(self, self.p).Show()
 
     def exclude(self, event):
@@ -913,7 +914,6 @@ class PronterWindow(MainWindow, pronsole.pronsole):
             wx.CallAfter(self.statusbar.SetStatusText, _("No file loaded. Please use load first."))
             return
         if not self.excluder:
-            from .excluder import Excluder
             self.excluder = Excluder()
         self.excluder.pop_window(self.fgcode, bgcolor = self.bgcolor,
                                  build_dimensions = self.build_dimensions_list)
@@ -2426,7 +2426,6 @@ class PronterWindow(MainWindow, pronsole.pronsole):
 
     def read_slic3r_config(self, configfile, parser = None):
         """Helper to read a Slic3r configuration file"""
-        import configparser
         parser = configparser.RawConfigParser()
 
         class add_header:
@@ -2442,7 +2441,6 @@ class PronterWindow(MainWindow, pronsole.pronsole):
                     return self.f.readline()
 
             def __iter__(self):
-                import itertools
                 return itertools.chain([self.header], iter(self.f))
 
         parser.read_file(add_header(open(configfile)), configfile)
