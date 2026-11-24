@@ -42,6 +42,19 @@ def make_custom_button(root, parentpanel, i, style = 0):
     return btn
 
 
+def get_italic_font(font: wx.Font) -> wx.Font:
+    """
+    Return an italic version of font.
+    On macOS (wx 3.2) the first italic variant of the system font that is
+    realised in a process stays upright (it is not resolved to
+    '.AppleSystemUIFontItalic'). Realising one throwaway italic font first
+    makes the following one come out correctly.
+    """
+    if wx.Platform == '__WXMAC__':
+        font.Italic().GetNativeFontInfoDesc()
+    return font.Italic()
+
+
 def get_scaled_icon(iconname: str, width: int, window: wx.Window,
                     iconbundle=None) -> wx.Icon:
     """

@@ -28,13 +28,13 @@ except ImportError:
     import json  # To load the response of api.github
 import webbrowser  # Used to open the github/releases website
 import wx
-import wx.adv  # Contains AboutDialogInfo()
+import wx.adv  # Contains HyperlinkCtrl
 import psutil  # Provides RAM information
 from pyglet import version as pyglet_version
 
 from printrun import printcore  # Needed for Printrun __version__
 from printrun.utils import install_locale
-from .utils import get_scaled_icon
+from .utils import get_scaled_icon, get_italic_font
 from platformdirs import user_config_dir  # Provides path to the settings directory
 from .widgets import get_space
 
@@ -42,42 +42,107 @@ install_locale('pronterface')
 
 class AboutDialog(wx.Dialog):
     '''
-    Create About Printrun Dialog
+    About Printrun Dialog, built from standard widgets.
     '''
     def __init__(self, parent, printed_filament: float):
-        '''Show About Printrun Dialog'''
-        wx.Dialog.__init__(self, parent)
+        '''Create the About Printrun Dialog'''
+        wx.Dialog.__init__(self, parent, title = _("About Printrun"),
+                           style = wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER)
+        self.SetIcon(parent.GetIcon())
+
+        major = get_space('major')
+        minor = get_space('minor')
+        mini = get_space('mini')
+        wrap_width = self.FromDIP(380)
+
+        # Header: icon, name, version
+        icon = get_scaled_icon("pronterface", 72, self,
+                               iconbundle = parent.GetIcons())
+        bmp = wx.StaticBitmap(self, -1, wx.BitmapBundle(icon))
+
+        name = wx.StaticText(self, -1, "Printrun")
+        name.SetFont(name.GetFont().Scaled(2.0).Bold())
+        version = wx.StaticText(self, -1, _("Version %s") % printcore.__version__)
+
+        description = wx.StaticText(self, -1,
+            _("Printrun is a pure Python host software for") + "\n" +
+            _("3D printing and other types of CNC machines.") + "\n" +
+            _("Pronterface is Printrun's graphical user interface."),
+            style = wx.ALIGN_CENTER_HORIZONTAL)
+        description.Wrap(wrap_width)
+
+        filament = wx.StaticText(self, -1,
+            _("%.02f mm of filament have been extruded during prints.") %
+            printed_filament, style = wx.ALIGN_CENTER_HORIZONTAL)
+        filament.Wrap(wrap_width)
+        filament.SetFont(get_italic_font(filament.GetFont()))
+
+        copyright_ = wx.StaticText(self, -1, f"(C) 2011 - {date.today().year}")
+        copyright_.SetFont(copyright_.GetFont().Scaled(0.9))
+        website = wx.adv.HyperlinkCtrl(self, -1, "github.com/kliment/Printrun",
+                                       "https://github.com/kliment/Printrun")
+
+        # Credits and licence
+        notebook = wx.Notebook(self, -1)
+        pages = ((_("Developers"), "\n".join(self.DEVELOPERS)),
+                 (_("Documentation"), "\n".join(self.DOC_WRITERS)),
+                 (_("Artwork"), "\n".join(self.ARTISTS)),
+                 (_("Translations"), "\n".join(self.TRANSLATORS)),
+                 (_("License"), self.LICENCE))
+        for label, text in pages:
+            notebook.AddPage(self._text_page(notebook, text), label)
+
+        # Layout
+        topsizer = wx.BoxSizer(wx.VERTICAL)
+        center = wx.ALIGN_CENTER_HORIZONTAL
+        titlesizer = wx.BoxSizer(wx.VERTICAL)
+        titlesizer.Add(name, 0, wx.ALIGN_LEFT)
+        titlesizer.Add(version, 0, wx.ALIGN_LEFT | wx.TOP, mini)
+        headersizer = wx.BoxSizer(wx.HORIZONTAL)
+        headersizer.Add(bmp, 0, wx.ALIGN_CENTER_VERTICAL)
+        headersizer.Add(titlesizer, 0, wx.ALIGN_CENTER_VERTICAL | wx.LEFT, major)
+        topsizer.Add(headersizer, 0, center | wx.TOP, major)
+        topsizer.Add(description, 0, center | wx.LEFT | wx.RIGHT | wx.TOP, major)
+        topsizer.Add(filament, 0, center | wx.LEFT | wx.RIGHT | wx.TOP, minor)
+        topsizer.Add(copyright_, 0, center | wx.TOP, minor)
+        topsizer.Add(website, 0, center | wx.TOP, mini)
+        topsizer.Add(notebook, 1, wx.EXPAND | wx.ALL, major)
+
+        btns = self.CreateStdDialogButtonSizer(wx.CLOSE)
+        self.SetEscapeId(wx.ID_CLOSE)
+        self.SetAffirmativeId(wx.ID_CLOSE)
+        topsizer.Add(btns, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM,
+                     get_space('stddlg'))
+
+        self.SetSizer(topsizer)
+        min_w = max(topsizer.GetMinSize()[0], wrap_width + 2 * major,
+                    self._tabs_width(notebook) + 2 * major)
+        self.SetMinClientSize(wx.Size(min_w, self.FromDIP(560)))
+        self.SetClientSize(self.GetMinClientSize())
+        self.Layout()
         self.CenterOnParent()
 
-        self.info = wx.adv.AboutDialogInfo()
+        self.Bind(wx.EVT_BUTTON, lambda e: self.Close(), id = wx.ID_CLOSE)
+        self.Bind(wx.EVT_CLOSE, lambda e: self.Destroy())
 
-        icon = get_scaled_icon("pronterface", 128, parent, iconbundle=parent.GetIcons())
-        self.info.SetIcon(icon)
+    def _tabs_width(self, notebook: wx.Notebook) -> int:
+        '''Approximate width needed to show all tab labels untruncated,
+        since wx.Notebook does not report it reliably on all platforms.'''
+        padding = self.FromDIP(28)
+        return sum(notebook.GetTextExtent(notebook.GetPageText(i))[0] + padding
+                   for i in range(notebook.GetPageCount()))
 
-        self.info.SetName('Printrun')
-        self.info.SetVersion(printcore.__version__)
-
-        description = ("              " +
-                       _("Printrun is a pure Python host software for") +
-                       "          \n           " +
-                       _("3D printing and other types of CNC machines.") +
-                       "          \n         " +
-                       _("Pronterface is Printrun's graphical user interface.") +
-                       "          \n      " +
-                       _("%.02f mm of filament have been extruded during prints.") %
-                       printed_filament)
-
-        self.info.SetDescription(description)
-
-        self.info.SetCopyright(f'(C) 2011 - {date.today().year}')
-        self.info.SetWebSite('https://github.com/kliment/Printrun')
-
-        self.info.SetLicence(self.LICENCE)
-        self.info.SetDevelopers(self.DEVELOPERS)
-        self.info.SetDocWriters(self.DOC_WRITERS)
-        self.info.SetArtists(self.ARTISTS)
-        self.info.SetTranslators(self.TRANSLATORS)
-        wx.adv.AboutBox(self.info, self)
+    @staticmethod
+    def _text_page(parent: wx.Window, text: str) -> wx.Panel:
+        '''Notebook page holding a read-only, multiline text box'''
+        panel = wx.Panel(parent)
+        textctrl = wx.TextCtrl(panel, -1, text,
+                               style = wx.TE_READONLY | wx.TE_CENTRE | wx.TE_MULTILINE |
+                               wx.TE_NOHIDESEL | wx.TE_WORDWRAP)
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(textctrl, 1, wx.EXPAND | wx.ALL, get_space('mini'))
+        panel.SetSizer(sizer)
+        return panel
 
     LICENCE = ('Printrun is free software: you can redistribute it '
                'and / or modify it under the terms of the GNU General '
